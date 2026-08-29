@@ -18,6 +18,7 @@ import {
 } from "@lightrsi/host-adapter";
 
 import { createClaudeCodeContextCleanerBridge } from "../src/context-cleaner/index.js";
+import { readClaudeCleanerSchedule } from "../src/context-cleaner/scheduler.js";
 import { saveLatestClaudeSnapshot } from "../src/context-rewrite/snapshot-store.js";
 import { upsertClaudeCodeSessionSnapshot } from "../src/session-state.js";
 
@@ -163,11 +164,12 @@ test("Claude cleaner bridge rejects a session without a canonical snapshot", asy
 });
 
 test("Claude cleaner bridge preserves approved targets and receipt evidence", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightrsi-claude-cleaner-bridge-schedule-"));
   let captured: ExecuteApprovedContextCleanParams | undefined;
   const applied = appliedReceipt();
   const cancelled = terminalReceipt("cancelled");
   const bridge = createClaudeCodeContextCleanerBridge({
-    stateDir: "unused-state-dir",
+    stateDir,
     controlPlane: {
       async executeApprovedClean(request) {
         captured = request;
@@ -177,20 +179,30 @@ test("Claude cleaner bridge preserves approved targets and receipt evidence", as
       async cancelCleanPlan() { return cancelled; },
     },
   });
-  const request = approval();
+  try {
+    const request = approval();
 
-  const scheduled = await bridge.executeApprovedClean(request);
-  assert.strictEqual(captured, request);
-  assert.equal(scheduled.status, "scheduled");
-  assert.equal("appliedSavedChars" in scheduled, false);
-  assert.strictEqual(await bridge.readCleanReceipt(PLAN), applied);
-  assert.deepEqual(applied.evidence, {
-    previousRevision: "revision-before",
-    nextRevision: "revision-after",
-    operationIds: ["operation-1"],
-    itemIds: ["item-1"],
-  });
-  assert.strictEqual(await bridge.cancelCleanPlan(PLAN), cancelled);
+    const scheduled = await bridge.executeApprovedClean(request);
+    assert.strictEqual(captured, request);
+    assert.equal(scheduled.status, "scheduled");
+    assert.equal("appliedSavedChars" in scheduled, false);
+    const local = await readClaudeCleanerSchedule({ stateDir, sessionId: SESSION });
+    assert.equal(local.outcome, "ready");
+    if (local.outcome === "ready") {
+      assert.equal(local.record.cleanPlanId, PLAN);
+      assert.deepEqual(local.record.selectedTaskIds, ["task-1"]);
+    }
+    assert.strictEqual(await bridge.readCleanReceipt(PLAN), applied);
+    assert.deepEqual(applied.evidence, {
+      previousRevision: "revision-before",
+      nextRevision: "revision-after",
+      operationIds: ["operation-1"],
+      itemIds: ["item-1"],
+    });
+    assert.strictEqual(await bridge.cancelCleanPlan(PLAN), cancelled);
+  } finally {
+    await rm(stateDir, { recursive: true, force: true });
+  }
 });
 
 test("Claude cleaner bridge rejects cross-host or mutated approvals before execution", async () => {
