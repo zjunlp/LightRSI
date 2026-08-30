@@ -77,7 +77,7 @@ function registry(): SessionTaskRegistry {
   };
 }
 
-test("scheduled Claude clean preempts lifecycle eviction and forwards its exact overlay", async () => {
+test("scheduled Claude clean retries after upstream rejection and commits only an accepted overlay", async () => {
   const root = await mkdtemp(join(tmpdir(), "lightrsi-claude-cleaner-gateway-"));
   const stateDir = join(root, "state");
   const proxyPort = await reserveUnusedPort();
@@ -154,6 +154,13 @@ test("scheduled Claude clean preempts lifecycle eviction and forwards its exact 
     async requestRaw() { throw new Error("requestRaw not used"); },
     async request(params) {
       forwarded.push(params.payload as Record<string, unknown>);
+      if (forwarded.length === 1) {
+        return {
+          status: 503,
+          headers: { "content-type": "application/json" },
+          text: JSON.stringify({ error: { type: "overloaded_error", message: "retry" } }),
+        };
+      }
       return {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -216,25 +223,34 @@ test("scheduled Claude clean preempts lifecycle eviction and forwards its exact 
       scheduledAt: NOW,
     })).outcome, "stored");
 
+    const requestBody = JSON.stringify({
+      model: "claude-sonnet-4-6",
+      stream: false,
+      messages: [
+        ...historicalMessages,
+        { role: "assistant", content: [{ type: "text", text: "previous response" }] },
+        { role: "user", content: [{ type: "text", text: "KEEP_CURRENT_REQUEST" }] },
+      ],
+      max_tokens: 128,
+    });
+    const rejected = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-session-id": SESSION },
+      body: requestBody,
+    });
+    assert.equal(rejected.status, 503);
+    assert.equal((await readContextCleanReceipt({ stateDir, planId: PLAN })).value?.status, "scheduled");
+
     const response = await fetch(`${runtime.baseUrl}/v1/messages`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-session-id": SESSION },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        stream: false,
-        messages: [
-          ...historicalMessages,
-          { role: "assistant", content: [{ type: "text", text: "previous response" }] },
-          { role: "user", content: [{ type: "text", text: "KEEP_CURRENT_REQUEST" }] },
-        ],
-        max_tokens: 128,
-      }),
+      body: requestBody,
     });
 
     assert.equal(response.status, 200);
     assert.equal(resolverCalls, 0);
-    assert.equal(forwarded.length, 1);
-    const messages = forwarded[0]!.messages as Array<Record<string, unknown>>;
+    assert.equal(forwarded.length, 2);
+    const messages = forwarded[1]!.messages as Array<Record<string, unknown>>;
     assert.deepEqual((messages[0]!.content as Array<Record<string, unknown>>)[0], {
       type: "tool_use",
       id: "toolu_cleaner_gateway",

@@ -563,10 +563,16 @@ export async function startClaudeCodeGatewayRuntime(params: {
         manualCleanerSuppressesAutomaticEviction = manual.suppressAutomaticEviction;
         if (manual.outcome === "prepared") {
           manualCleanerOverlay = manual;
-          payload = { ...(payload as Record<string, unknown>), messages: manual.request.messages };
-          envelope = codec.decodeRequest(payload, {
-            headers: req.headers as Record<string, string | string[] | undefined>,
-          });
+          try {
+            payload = { ...(payload as Record<string, unknown>), messages: manual.request.messages };
+            envelope = codec.decodeRequest(payload, {
+              headers: req.headers as Record<string, string | string[] | undefined>,
+            });
+          } catch (error) {
+            await abandonClaudeCleanerOverlay(manual);
+            manualCleanerOverlay = undefined;
+            throw error;
+          }
         } else if (manual.outcome === "reserved") {
           logger.warn(`context cleaner manual overlay deferred (ignored): ${manual.reasonCodes.join(",")}`);
         }
@@ -575,9 +581,8 @@ export async function startClaudeCodeGatewayRuntime(params: {
         manualCleanerSuppressesAutomaticEviction = schedule.outcome === "ready";
       }
 
-      // Persist the complete original inbound history after manual Cleaner has
-      // consumed the previous baseline, but before any automatic overlay.
-      if (cleanerSnapshot) {
+      const persistCleanerSnapshot = async (): Promise<void> => {
+        if (!cleanerSnapshot) return;
         try {
           const saveResult = await (
             params.dependencies?.saveSnapshot ?? saveLatestClaudeSnapshot
@@ -590,6 +595,12 @@ export async function startClaudeCodeGatewayRuntime(params: {
         } catch (error) {
           logger.warn(`context cleaner snapshot persistence failed (ignored): ${String(error)}`);
         }
+      };
+
+      // A prepared manual overlay keeps the approval-time snapshot as its retry
+      // anchor until the upstream accepts and the applied receipt commits.
+      if (!manualCleanerOverlay) {
+        await persistCleanerSnapshot();
       }
 
       if (evictionEnabled && !manualCleanerSuppressesAutomaticEviction) {
@@ -799,66 +810,75 @@ export async function startClaudeCodeGatewayRuntime(params: {
       const authorization = typeof req.headers.authorization === "string" ? req.headers.authorization : undefined;
       const model = envelope.model;
       const workspaceHint = extractWorkspaceHint(envelope);
-      const prepared = await prepareObservedBeforeCall<ClaudeReductionSummary>({
-        envelope,
-        codec,
-        config: { mode: "normal" },
-        prepareStablePrefix(nextEnvelope) {
-          return prepareClaudeStablePrefix(nextEnvelope, config);
-        },
-        async applyBeforeCallReduction({ envelope: nextEnvelope, codec: nextCodec }) {
-          return reduceClaudeRequestEnvelope({
-            envelope: nextEnvelope,
-            codec: nextCodec,
-            config,
-          });
-        },
-        observability: {
-          stateDir: config.stateDir,
-          sessionId,
-          model,
-          recordUxEffectNow: false,
-          buildStability({ originalEnvelope, prepared }) {
-            return prepared.diagnostics.stablePrefixApplied === true
-              ? buildStabilityVisualSnapshotFromEnvelopes({
-                sessionId,
-                model,
-                upstreamModel: model,
-                originalEnvelope,
-                preparedEnvelope: prepared.envelope,
-                dynamicContextTarget: config.hooks.dynamicContextTarget,
-                getDeveloperText(envelope) {
-                  return typeof envelope.instructions === "string" ? envelope.instructions : "";
-                },
-              })
-              : undefined;
+      let prepared: Awaited<ReturnType<typeof prepareObservedBeforeCall<ClaudeReductionSummary>>>;
+      try {
+        prepared = await prepareObservedBeforeCall<ClaudeReductionSummary>({
+          envelope,
+          codec,
+          config: { mode: "normal" },
+          prepareStablePrefix(nextEnvelope) {
+            return prepareClaudeStablePrefix(nextEnvelope, config);
           },
-          buildReduction(reductionSummary) {
-            return reductionSummary.savedChars > 0
-              ? {
-                countMode: "chars",
-                beforeCount: reductionSummary.beforeChars,
-                afterCount: reductionSummary.afterChars,
-                savedCount: reductionSummary.savedChars,
-                details: {
-                  requestSavedCount: reductionSummary.savedChars,
-                },
-                segments: (reductionSummary.visualSegments ?? []).map((segment) => ({
-                  segmentId: segment.segmentId,
-                  itemIndex: segment.messageIndex,
-                  field: segment.field === "text" ? "content" : segment.field,
-                  blockIndex: segment.blockIndex,
-                  toolName: segment.toolName,
-                  savedChars: segment.savedChars,
-                  beforeText: segment.beforeText,
-                  afterText: segment.afterText,
-                  report: segment.report,
-                })),
-              }
-              : undefined;
+          async applyBeforeCallReduction({ envelope: nextEnvelope, codec: nextCodec }) {
+            return reduceClaudeRequestEnvelope({
+              envelope: nextEnvelope,
+              codec: nextCodec,
+              config,
+            });
           },
-        },
-      });
+          observability: {
+            stateDir: config.stateDir,
+            sessionId,
+            model,
+            recordUxEffectNow: false,
+            buildStability({ originalEnvelope, prepared }) {
+              return prepared.diagnostics.stablePrefixApplied === true
+                ? buildStabilityVisualSnapshotFromEnvelopes({
+                  sessionId,
+                  model,
+                  upstreamModel: model,
+                  originalEnvelope,
+                  preparedEnvelope: prepared.envelope,
+                  dynamicContextTarget: config.hooks.dynamicContextTarget,
+                  getDeveloperText(envelope) {
+                    return typeof envelope.instructions === "string" ? envelope.instructions : "";
+                  },
+                })
+                : undefined;
+            },
+            buildReduction(reductionSummary) {
+              return reductionSummary.savedChars > 0
+                ? {
+                  countMode: "chars",
+                  beforeCount: reductionSummary.beforeChars,
+                  afterCount: reductionSummary.afterChars,
+                  savedCount: reductionSummary.savedChars,
+                  details: {
+                    requestSavedCount: reductionSummary.savedChars,
+                  },
+                  segments: (reductionSummary.visualSegments ?? []).map((segment) => ({
+                    segmentId: segment.segmentId,
+                    itemIndex: segment.messageIndex,
+                    field: segment.field === "text" ? "content" : segment.field,
+                    blockIndex: segment.blockIndex,
+                    toolName: segment.toolName,
+                    savedChars: segment.savedChars,
+                    beforeText: segment.beforeText,
+                    afterText: segment.afterText,
+                    report: segment.report,
+                  })),
+                }
+                : undefined;
+            },
+          },
+        });
+      } catch (error) {
+        if (manualCleanerOverlay) {
+          await abandonClaudeCleanerOverlay(manualCleanerOverlay).catch(() => undefined);
+          manualCleanerOverlay = undefined;
+        }
+        throw error;
+      }
       const reductionSummary = prepared.reductionSummary;
       {
         const encoded = encodeRequestOrBypass({ codec, envelope: prepared.envelope, rawBody: body });
@@ -871,26 +891,34 @@ export async function startClaudeCodeGatewayRuntime(params: {
           if (encoded.bypassed) {
             await abandonClaudeCleanerOverlay(manualCleanerOverlay);
             manualCleanerOverlay = undefined;
-          } else {
-            const finalized = await finalizeClaudeCleanerOverlay({
-              stateDir: config.stateDir,
-              prepared: manualCleanerOverlay,
-            });
-            manualCleanerOverlay = undefined;
-            if (finalized.outcome !== "applied") {
-              // Receipt persistence is part of the manual-clean transaction.
-              // Never send an unrecorded overlay; preserve the caller payload.
-              payload = JSON.parse(body) as Record<string, unknown>;
-              envelope = codec.decodeRequest(payload, {
-                headers: req.headers as Record<string, string | string[] | undefined>,
-              });
-              logger.warn(`context cleaner manual overlay bypassed (ignored): ${finalized.reasonCodes.join(",")}`);
-            } else if (finalized.reasonCodes.length > 0) {
-              logger.warn(`context cleaner manual overlay local recovery needed: ${finalized.reasonCodes.join(",")}`);
-            }
+            await persistCleanerSnapshot();
           }
         }
       }
+
+      const settleManualCleanerOverlay = async (upstreamAccepted: boolean): Promise<void> => {
+        const pending = manualCleanerOverlay;
+        manualCleanerOverlay = undefined;
+        if (!pending) return;
+        try {
+          if (!upstreamAccepted) {
+            await abandonClaudeCleanerOverlay(pending);
+            return;
+          }
+          const finalized = await finalizeClaudeCleanerOverlay({
+            stateDir: config.stateDir,
+            prepared: pending,
+          });
+          if (finalized.outcome !== "applied") {
+            logger.warn(`context cleaner manual overlay receipt deferred (ignored): ${finalized.reasonCodes.join(",")}`);
+          } else if (finalized.reasonCodes.length > 0) {
+            logger.warn(`context cleaner manual overlay local recovery needed: ${finalized.reasonCodes.join(",")}`);
+          }
+          if (finalized.outcome === "applied") await persistCleanerSnapshot();
+        } catch (error) {
+          logger.warn(`context cleaner manual overlay settlement failed (ignored): ${String(error)}`);
+        }
+      };
       const reducedRequestText = typeof prepared.envelope.metadata?.inputText === "string"
         ? prepared.envelope.metadata.inputText
         : "";
@@ -911,38 +939,49 @@ export async function startClaudeCodeGatewayRuntime(params: {
             : null,
       });
 
-      await appendClaudeCodeTrace(config.stateDir, {
-        stage: "gateway_before_call",
-        sessionId,
-        model: prepared.envelope.model,
-        stream: prepared.envelope.stream,
-        requestChars: body.length,
-        stablePrefixApplied: prepared.diagnostics.stablePrefixApplied === true,
-        reductionApplied: prepared.diagnostics.reductionApplied === true,
-        reductionSavedChars: reductionSummary?.savedChars ?? 0,
-        reductionChangedBlocks: reductionSummary?.changedBlocks ?? 0,
-        reductionChangedMessages: reductionSummary?.changedMessages ?? 0,
-        reductionSkippedReason: reductionSummary?.skippedReason ?? null,
-        reductionPassEffects: reductionSummary?.passEffects ?? [],
-        evictionEnabled: evictionSummary.enabled,
-        evictionApplied: evictionSummary.changed,
-        evictionSavedChars: evictionSummary.savedChars,
-        evictionChangedMessages: evictionSummary.evictedMessageCount,
-        evictionChangedToolResults: evictionSummary.evictedToolResultCount,
-        evictionBypassReason: evictionBypassReason ?? null,
-        evictionPlanSource,
-        lifecyclePlannerStatus,
-        lifecyclePlannerReasonCodes,
-        lifecycleRegistryVersion: lifecycleRegistryVersion ?? null,
-      });
+      try {
+        await appendClaudeCodeTrace(config.stateDir, {
+          stage: "gateway_before_call",
+          sessionId,
+          model: prepared.envelope.model,
+          stream: prepared.envelope.stream,
+          requestChars: body.length,
+          stablePrefixApplied: prepared.diagnostics.stablePrefixApplied === true,
+          reductionApplied: prepared.diagnostics.reductionApplied === true,
+          reductionSavedChars: reductionSummary?.savedChars ?? 0,
+          reductionChangedBlocks: reductionSummary?.changedBlocks ?? 0,
+          reductionChangedMessages: reductionSummary?.changedMessages ?? 0,
+          reductionSkippedReason: reductionSummary?.skippedReason ?? null,
+          reductionPassEffects: reductionSummary?.passEffects ?? [],
+          evictionEnabled: evictionSummary.enabled,
+          evictionApplied: evictionSummary.changed,
+          evictionSavedChars: evictionSummary.savedChars,
+          evictionChangedMessages: evictionSummary.evictedMessageCount,
+          evictionChangedToolResults: evictionSummary.evictedToolResultCount,
+          evictionBypassReason: evictionBypassReason ?? null,
+          evictionPlanSource,
+          lifecyclePlannerStatus,
+          lifecyclePlannerReasonCodes,
+          lifecycleRegistryVersion: lifecycleRegistryVersion ?? null,
+        });
+      } catch (error) {
+        await settleManualCleanerOverlay(false);
+        throw error;
+      }
 
       if (prepared.envelope.stream) {
-        const upstreamResp = await forwarder.requestStream({
-          upstream,
-          payload,
-          inboundAuthorization: authorization,
-          inboundHeaders: normalizeRequestHeaders(req.headers),
-        });
+        let upstreamResp: Awaited<ReturnType<HostGatewayForwarder["requestStream"]>>;
+        try {
+          upstreamResp = await forwarder.requestStream({
+            upstream,
+            payload,
+            inboundAuthorization: authorization,
+            inboundHeaders: normalizeRequestHeaders(req.headers),
+          });
+        } catch (error) {
+          await settleManualCleanerOverlay(false);
+          throw error;
+        }
         res.statusCode = upstreamResp.status;
         setForwardResponseHeaders(res, upstreamResp.headers, "text/event-stream; charset=utf-8");
         const chunks: Buffer[] = [];
@@ -954,6 +993,7 @@ export async function startClaudeCodeGatewayRuntime(params: {
         upstreamResp.stream.once("end", async () => {
           const rawStreamText = Buffer.concat(chunks).toString("utf8");
           const snapshot = streamObserver.snapshot(rawStreamText);
+          await settleManualCleanerOverlay(upstreamResp.status >= 200 && upstreamResp.status < 300);
           const responseId = typeof snapshot.metadata?.responseId === "string" ? snapshot.metadata.responseId : undefined;
           const previousResponseId =
             typeof snapshot.metadata?.previousResponseId === "string" ? snapshot.metadata.previousResponseId : undefined;
@@ -999,7 +1039,8 @@ export async function startClaudeCodeGatewayRuntime(params: {
           });
           res.end();
         });
-        upstreamResp.stream.once("error", (error) => {
+        upstreamResp.stream.once("error", async (error) => {
+          await settleManualCleanerOverlay(false).catch(() => undefined);
           logger.error(error instanceof Error ? error.message : String(error));
           void appendClaudeCodeTrace(config.stateDir, {
             stage: "gateway_after_call",
@@ -1016,12 +1057,19 @@ export async function startClaudeCodeGatewayRuntime(params: {
         return;
       }
 
-      const upstreamResp = await forwarder.request({
-        upstream,
-        payload,
-        inboundAuthorization: authorization,
-        inboundHeaders: normalizeRequestHeaders(req.headers),
-      });
+      let upstreamResp: Awaited<ReturnType<HostGatewayForwarder["request"]>>;
+      try {
+        upstreamResp = await forwarder.request({
+          upstream,
+          payload,
+          inboundAuthorization: authorization,
+          inboundHeaders: normalizeRequestHeaders(req.headers),
+        });
+      } catch (error) {
+        await settleManualCleanerOverlay(false);
+        throw error;
+      }
+      await settleManualCleanerOverlay(upstreamResp.status >= 200 && upstreamResp.status < 300);
       setForwardResponseHeaders(res, upstreamResp.headers, "application/json; charset=utf-8");
       res.statusCode = upstreamResp.status;
       let assistantChars = 0;
