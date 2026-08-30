@@ -87,8 +87,17 @@ function messagesRevision(messages: RuntimeMessage[]): string {
     .digest("hex")}`;
 }
 
-function isRewritableBlock(block: Record<string, unknown>): boolean {
-  return block.type === "tool_result" || block.type === "text";
+function isRewritableBlock(
+  block: Record<string, unknown>,
+  sourceModuleId: string,
+): boolean {
+  return block.type === "tool_result"
+    || block.type === "text"
+    // A Cleaner approval freezes both sides of a closed pair. Keep the
+    // protocol identifiers, but remove the historical tool input as part of
+    // that exact, user-approved scope. Automatic eviction keeps its existing
+    // result-only behavior.
+    || (block.type === "tool_use" && sourceModuleId === "cleaner_manual");
 }
 
 function claudeToolClosureReasons(
@@ -109,6 +118,7 @@ function claudeToolClosureReasons(
   const itemById = new Map(snapshot.items.map((item) => [item.stableId, item]));
   const reasons = new Map<string, string>();
   for (const operation of plan.operations) {
+    const targetIds = new Set(operation.targetItemIds);
     for (const targetId of operation.targetItemIds) {
       const item = itemById.get(targetId);
       if (!item || (item.kind !== "tool_call" && item.kind !== "tool_result")) continue;
@@ -119,6 +129,14 @@ function claudeToolClosureReasons(
       if ((calls.get(item.callId) ?? 0) !== 1 || (results.get(item.callId) ?? 0) !== 1) {
         reasons.set(operation.id, `operation ${operation.id} targets an incomplete tool pair`);
         break;
+      }
+      if (plan.sourceModuleId === "cleaner_manual") {
+        const pair = snapshot.items.filter((candidate) => candidate.callId === item.callId
+          && (candidate.kind === "tool_call" || candidate.kind === "tool_result"));
+        if (pair.some((candidate) => !targetIds.has(candidate.stableId))) {
+          reasons.set(operation.id, `operation ${operation.id} targets only part of a tool pair`);
+          break;
+        }
       }
     }
   }
@@ -150,6 +168,14 @@ function recoveryRefForBlock(
 }
 
 function stubBlock(block: Record<string, unknown>, recoveryRef?: string): Record<string, unknown> {
+  if (block.type === "tool_use") {
+    return {
+      type: "tool_use",
+      id: block.id,
+      name: block.name,
+      input: {},
+    };
+  }
   if (block.type === "tool_result") {
     return {
       type: "tool_result",
@@ -320,8 +346,10 @@ export const claudeContextRewriteBackend: ModelContextRewriteBackend<ClaudeOverl
           }
           if (!Array.isArray(message.content)) continue;
           const block = asBlockRecord(message.content[blockIdx]);
-          if (!block || !isRewritableBlock(block)) continue;
-          // tool_use is half of a pair; leave it so closure stays intact.
+          if (!block || !isRewritableBlock(block, plan.sourceModuleId)) continue;
+          // A manual Cleaner scope contains both sides of a valid pair. Its
+          // tool-use stub retains id/name and an object input, so the rewritten
+          // Messages history remains structurally closed.
           const recoveryRef = recoveryRefForBlock(block, op.archiveRefs);
           const stub = stubBlock(block, recoveryRef);
           savedChars += Math.max(0, blockCharCount(block) - blockCharCount(stub));

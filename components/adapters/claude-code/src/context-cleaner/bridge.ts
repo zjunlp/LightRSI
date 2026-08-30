@@ -8,6 +8,7 @@ import {
 
 import { readLatestClaudeSnapshotRecord } from "../context-rewrite/snapshot-store.js";
 import { listClaudeCleanerSessions } from "./session-catalog.js";
+import { scheduleClaudeCleanerPlan } from "./scheduler.js";
 
 const CLAUDE_HOST_ID = "claude-code";
 
@@ -170,12 +171,26 @@ export function createClaudeCodeContextCleanerBridge(params: {
     },
     async executeApprovedClean(request) {
       const selectedTaskIds = validateApprovedRequest(request);
-      return validateReceipt({
+      const receipt = validateReceipt({
         receipt: await params.controlPlane.executeApprovedClean(request),
         planId: request.cleanPlanId,
         sessionId: request.sessionId,
         selectedTaskIds,
       });
+      if (receipt.status === "scheduled") {
+        const scheduled = await scheduleClaudeCleanerPlan({
+          stateDir: params.stateDir,
+          sessionId: request.sessionId,
+          cleanPlanId: request.cleanPlanId,
+          baseRevision: request.baseRevision,
+          selectedTaskIds,
+          scheduledAt: receipt.updatedAt,
+        });
+        if (scheduled.outcome !== "stored" && scheduled.outcome !== "unchanged") {
+          throw new Error(`claude_clean_schedule_failed:${scheduled.reasons.join(",")}`);
+        }
+      }
+      return receipt;
     },
     async readCleanReceipt(planId) {
       if (!planId.trim()) throw new Error("claude_clean_plan_id_invalid");

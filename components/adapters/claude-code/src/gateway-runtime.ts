@@ -38,7 +38,10 @@ import {
 import { loadSessionTaskRegistry, persistSessionTaskRegistry } from "@lightrsi/history";
 import { claudeContextRewriteBackend, relocateContextMutationPlan } from "./context-rewrite/backend.js";
 import { applyArchivePlan } from "./context-rewrite/archive.js";
-import { saveLatestClaudeSnapshot } from "./context-rewrite/snapshot-store.js";
+import {
+  readLatestClaudeSnapshotRecord,
+  saveLatestClaudeSnapshot,
+} from "./context-rewrite/snapshot-store.js";
 import { appendOverlayHistory } from "./context-rewrite/overlay-history.js";
 import { resolveClaudeTaskStateEstimator } from "./context-rewrite/estimator-config.js";
 import { prepareSemanticDelta } from "./context-rewrite/semantic-pipeline.js";
@@ -65,6 +68,12 @@ import { resolveLatestClaudeCodeSessionId } from "./session-state.js";
 import { lookupRealSessionId, recordSessionMapping } from "./context-rewrite/session-map.js";
 import { initializeClaudeCodeTokenPilotPreset } from "./preset.js";
 import { attributeClaudeSnapshotTasks } from "./context-cleaner/snapshot.js";
+import {
+  abandonClaudeCleanerOverlay,
+  finalizeClaudeCleanerOverlay,
+  prepareClaudeCleanerOverlay,
+} from "./context-cleaner/runtime.js";
+import { readClaudeCleanerSchedule } from "./context-cleaner/scheduler.js";
 
 export type ClaudeCodeGatewayRuntime = {
   baseUrl: string;
@@ -367,24 +376,56 @@ export async function startClaudeCodeGatewayRuntime(params: {
       let lifecyclePlannerStatus: "completed" | "deferred" | "bypassed" | "not_configured" = "not_configured";
       let lifecyclePlannerReasonCodes: string[] = [];
       let lifecycleRegistryVersion: number | undefined;
+      let manualCleanerOverlay: Extract<
+        Awaited<ReturnType<typeof prepareClaudeCleanerOverlay>>,
+        { outcome: "prepared" }
+      > | undefined;
+      let manualCleanerSuppressesAutomaticEviction = false;
 
-      // Lifecycle planner (estimator-driven). Runs UNCONDITIONALLY (independent
-      // of the eviction toggle) so registry updates happen every turn, exactly
-      // where the old runSemanticPipeline used to. Only the plannerPlan -> overlay
-      // execution below is gated by evictionEnabled. Fail-open: any error leaves
-      // plannerPlan undefined and the request proceeds unchanged.
+      // A scheduled manual clean owns the next safe rewrite boundary. Check the
+      // adapter-local marker before lifecycle analysis so an automatic planner
+      // cannot race it or advance task state on the same request. A malformed
+      // or unreadable marker is also fail-closed for automatic eviction.
+      try {
+        const manualSchedule = await readClaudeCleanerSchedule({
+          stateDir: config.stateDir,
+          sessionId,
+        });
+        if (manualSchedule.outcome === "ready" || manualSchedule.outcome === "bypassed") {
+          manualCleanerSuppressesAutomaticEviction = true;
+          lifecyclePlannerStatus = "deferred";
+          lifecyclePlannerReasonCodes = [
+            manualSchedule.outcome === "ready"
+              ? "manual_cleaner_schedule_pending"
+              : "manual_cleaner_schedule_unavailable",
+          ];
+        }
+      } catch (error) {
+        manualCleanerSuppressesAutomaticEviction = true;
+        lifecyclePlannerStatus = "deferred";
+        lifecyclePlannerReasonCodes = ["manual_cleaner_schedule_unavailable"];
+        logger.warn(`context cleaner schedule check failed (ignored): ${String(error)}`);
+      }
+
+      // Lifecycle planner (estimator-driven) runs independently of the eviction
+      // toggle so registry updates happen every ordinary turn. A pending manual
+      // Cleaner schedule is the one exception: it exclusively owns this request
+      // boundary. Fail-open: any planner error leaves plannerPlan undefined and
+      // the request proceeds unchanged.
       let plannerPlan: ReturnType<typeof buildContextMutationPlan> | undefined;
       let lifecycleEstimator: ReturnType<typeof resolveClaudeTaskStateEstimator>;
-      try {
-        lifecycleEstimator = (params.dependencies?.resolveEstimator ?? resolveClaudeTaskStateEstimator)({
-          config: config.taskStateEstimator,
-          env: process.env,
-        });
-      } catch (error) {
-        lifecycleEstimator = undefined;
-        lifecyclePlannerStatus = "bypassed";
-        lifecyclePlannerReasonCodes = ["estimator_resolver_error"];
-        logger.warn(`lifecycle estimator resolver failed (ignored): ${String(error)}`);
+      if (!manualCleanerSuppressesAutomaticEviction) {
+        try {
+          lifecycleEstimator = (params.dependencies?.resolveEstimator ?? resolveClaudeTaskStateEstimator)({
+            config: config.taskStateEstimator,
+            env: process.env,
+          });
+        } catch (error) {
+          lifecycleEstimator = undefined;
+          lifecyclePlannerStatus = "bypassed";
+          lifecyclePlannerReasonCodes = ["estimator_resolver_error"];
+          logger.warn(`lifecycle estimator resolver failed (ignored): ${String(error)}`);
+        }
       }
       if (lifecycleEstimator) {
         try {
@@ -463,10 +504,22 @@ export async function startClaudeCodeGatewayRuntime(params: {
         }
       }
 
-      // Persist the complete inbound history only after the lifecycle registry
-      // update attempt has settled, but before any eviction/reduction overlay.
-      // The store is side work: failure is visible in logs and never blocks the
-      // model request.
+      // A scheduled manual clean must validate against the canonical snapshot
+      // from approval time. Read that base before this request replaces it.
+      let previousCleanerSnapshot: Awaited<ReturnType<typeof readLatestClaudeSnapshotRecord>>;
+      try {
+        previousCleanerSnapshot = await readLatestClaudeSnapshotRecord(config.stateDir, sessionId);
+      } catch (error) {
+        logger.warn(`context cleaner base snapshot read failed (ignored): ${String(error)}`);
+      }
+
+      // Build the current canonical snapshot after lifecycle update, then let a
+      // pending manual Cleaner plan preempt automatic eviction for this request.
+      // The snapshot persisted below remains the original inbound request.
+      let cleanerSnapshot:
+        | Awaited<ReturnType<typeof claudeContextRewriteBackend.readSnapshot>>
+        | undefined;
+      let cleanerRegistry: Awaited<ReturnType<typeof loadSessionTaskRegistry>> | undefined;
       try {
         const baseCleanerSnapshot = await claudeContextRewriteBackend.readSnapshot({
           sessionId,
@@ -476,9 +529,9 @@ export async function startClaudeCodeGatewayRuntime(params: {
             messages: plannerMessages as unknown as RuntimeMessage[],
           },
         });
-        let cleanerSnapshot = baseCleanerSnapshot;
+        cleanerSnapshot = baseCleanerSnapshot;
         try {
-          const cleanerRegistry = await loadSessionTaskRegistry(config.stateDir, sessionId);
+          cleanerRegistry = await loadSessionTaskRegistry(config.stateDir, sessionId);
           cleanerSnapshot = attributeClaudeSnapshotTasks({
             snapshot: baseCleanerSnapshot,
             messages: plannerMessages,
@@ -489,19 +542,57 @@ export async function startClaudeCodeGatewayRuntime(params: {
           // registry recovery fails so Cleaner can still inspect unassigned context.
           logger.warn(`context cleaner task attribution failed (ignored): ${String(error)}`);
         }
-        const saveResult = await (
-          params.dependencies?.saveSnapshot ?? saveLatestClaudeSnapshot
-        )(config.stateDir, sessionId, cleanerSnapshot, { model: envelope.model });
-        if (!saveResult.saved) {
-          logger.warn(
-            `context cleaner snapshot persistence failed (ignored): ${saveResult.reason}`,
-          );
-        }
       } catch (error) {
-        logger.warn(`context cleaner snapshot persistence failed (ignored): ${String(error)}`);
+        logger.warn(`context cleaner snapshot preparation failed (ignored): ${String(error)}`);
       }
 
-      if (evictionEnabled) {
+      if (cleanerSnapshot && cleanerRegistry) {
+        const manual = await prepareClaudeCleanerOverlay({
+          stateDir: config.stateDir,
+          sessionId,
+          baseSnapshot: previousCleanerSnapshot?.snapshot ?? cleanerSnapshot,
+          currentSnapshot: cleanerSnapshot,
+          request: {
+            sessionId,
+            revision: cleanerSnapshotRevision,
+            messages: plannerMessages as RuntimeMessage[],
+          },
+          activeTaskIds: cleanerRegistry.activeTaskIds,
+          evictableTaskIds: cleanerRegistry.evictableTaskIds,
+        });
+        manualCleanerSuppressesAutomaticEviction = manual.suppressAutomaticEviction;
+        if (manual.outcome === "prepared") {
+          manualCleanerOverlay = manual;
+          payload = { ...(payload as Record<string, unknown>), messages: manual.request.messages };
+          envelope = codec.decodeRequest(payload, {
+            headers: req.headers as Record<string, string | string[] | undefined>,
+          });
+        } else if (manual.outcome === "reserved") {
+          logger.warn(`context cleaner manual overlay deferred (ignored): ${manual.reasonCodes.join(",")}`);
+        }
+      } else if (!manualCleanerSuppressesAutomaticEviction) {
+        const schedule = await readClaudeCleanerSchedule({ stateDir: config.stateDir, sessionId });
+        manualCleanerSuppressesAutomaticEviction = schedule.outcome === "ready";
+      }
+
+      // Persist the complete original inbound history after manual Cleaner has
+      // consumed the previous baseline, but before any automatic overlay.
+      if (cleanerSnapshot) {
+        try {
+          const saveResult = await (
+            params.dependencies?.saveSnapshot ?? saveLatestClaudeSnapshot
+          )(config.stateDir, sessionId, cleanerSnapshot, { model: envelope.model });
+          if (!saveResult.saved) {
+            logger.warn(
+              `context cleaner snapshot persistence failed (ignored): ${saveResult.reason}`,
+            );
+          }
+        } catch (error) {
+          logger.warn(`context cleaner snapshot persistence failed (ignored): ${String(error)}`);
+        }
+      }
+
+      if (evictionEnabled && !manualCleanerSuppressesAutomaticEviction) {
         try {
           const candidatePayload = (
             params.dependencies?.cloneRequestPayload ?? structuredClone
@@ -775,6 +866,29 @@ export async function startClaudeCodeGatewayRuntime(params: {
         if (encoded.bypassed) {
           evictionBypassReason = "encode_error";
           logger.warn("context overlay bypassed category=encode_error");
+        }
+        if (manualCleanerOverlay) {
+          if (encoded.bypassed) {
+            await abandonClaudeCleanerOverlay(manualCleanerOverlay);
+            manualCleanerOverlay = undefined;
+          } else {
+            const finalized = await finalizeClaudeCleanerOverlay({
+              stateDir: config.stateDir,
+              prepared: manualCleanerOverlay,
+            });
+            manualCleanerOverlay = undefined;
+            if (finalized.outcome !== "applied") {
+              // Receipt persistence is part of the manual-clean transaction.
+              // Never send an unrecorded overlay; preserve the caller payload.
+              payload = JSON.parse(body) as Record<string, unknown>;
+              envelope = codec.decodeRequest(payload, {
+                headers: req.headers as Record<string, string | string[] | undefined>,
+              });
+              logger.warn(`context cleaner manual overlay bypassed (ignored): ${finalized.reasonCodes.join(",")}`);
+            } else if (finalized.reasonCodes.length > 0) {
+              logger.warn(`context cleaner manual overlay local recovery needed: ${finalized.reasonCodes.join(",")}`);
+            }
+          }
         }
       }
       const reducedRequestText = typeof prepared.envelope.metadata?.inputText === "string"
