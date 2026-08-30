@@ -15,6 +15,10 @@ export function formatCliUsage(): string {
     "  report",
     "  doctor",
     "  visual",
+    "  clean [--session <session-id>]",
+    "  clean --plan <plan-id> --select <task-ids>",
+    "  clean --status <plan-id>",
+    "  clean --cancel <plan-id>",
     "  mode <conservative|normal|aggressive>",
     "  settings details <on|off>",
     "  stabilizer ...",
@@ -28,6 +32,7 @@ export function formatCliUsage(): string {
     "  lightrsi report",
     "  lightrsi openclaw doctor",
     "  lightrsi claude-code doctor",
+    "  lightrsi codex session <session-id> clean",
     "  lightrsi openclaw session 123e4567-e89b-12d3-a456-426614174000 report",
     "  lightrsi use openclaw",
   ].join("\n");
