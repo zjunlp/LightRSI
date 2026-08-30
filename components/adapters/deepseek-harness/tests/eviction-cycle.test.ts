@@ -65,14 +65,14 @@ function estimatorFor(c: ReturnType<typeof caseById>) {
 }
 
 function mockSession(c: ReturnType<typeof caseById>) {
-  const log: Array<{ type: string; opts?: AppendOptions }> = [];
+  const log: Array<{ type: string; data: unknown; opts?: AppendOptions }> = [];
   let nextSeq = 1000;
   const session = {
     id: c.sessionId,
     events: c.events,
     surface: { nodes: c.effectiveEventSeqs, replaceGeneration: 0 },
-    append(type: string, _data: unknown, opts?: AppendOptions): AppendedEvent {
-      log.push({ type, opts });
+    append(type: string, data: unknown, opts?: AppendOptions): AppendedEvent {
+      log.push({ type, data, opts });
       return { seq: nextSeq++ };
     },
   };
@@ -98,7 +98,20 @@ describe("runDshEvictionCycle against the G1 oracle", () => {
     for (const item of c.expected.items) {
       if (item.action === "keep") assert.ok(!out.result.appliedSeqs.includes(item.sourceEventSeq), `seq ${item.sourceEventSeq} kept`);
     }
-    assert.equal(log.filter((e) => e.type === "user/message").length, expectedEvict.length);
+    assert.equal(log.filter((e) => e.opts?.surfaceOp !== undefined).length, expectedEvict.length);
+    const replacements = log.filter((event) => event.opts?.surfaceOp !== undefined);
+    assert.deepEqual(replacements.map((event) => event.type), ["user/message", "tool/result"]);
+    const user = replacements[0]!.data as { id: string; role: string; source: { kind: string } };
+    assert.equal(user.role, "user");
+    assert.equal(user.source.kind, "plugin");
+    assert.ok(user.id.length > 0);
+    const result = replacements[1]!.data as {
+      message: { id: string; source: { callId: string }; content: Array<{ toolCallId: string; content: Array<{ text: string }> }> };
+    };
+    assert.equal(result.message.id, "message-result-5");
+    assert.equal(result.message.source.callId, "call_completed");
+    assert.equal(result.message.content[0]!.toolCallId, "call_completed");
+    assert.match(result.message.content[0]!.content[0]!.text, /^\[evicted:/);
   });
 
   it("evicts nothing for the compaction case (all keep)", async () => {
@@ -112,6 +125,83 @@ describe("runDshEvictionCycle against the G1 oracle", () => {
     });
     assert.deepEqual(out.result.appliedSeqs, []);
   });
+
+  it("persists the registry before the first canonical replacement", async () => {
+    const c = caseById("lifecycle-and-tool-safety");
+    const { session, log } = mockSession(c);
+    const order: string[] = [];
+    const originalAppend = session.append.bind(session);
+    session.append = (type, data, opts) => {
+      order.push("append");
+      return originalAppend(type, data, opts);
+    };
+    await runDshEvictionCycle({
+      session,
+      registry: createEmptySessionTaskRegistry(c.sessionId),
+      estimator: estimatorFor(c),
+      computeRevision: stableRevision,
+      persistRegistry() { order.push("persist"); },
+    });
+    assert.ok(log.length > 0);
+    assert.equal(order[0], "persist");
+  });
+
+  it("does not mutate the surface when registry persistence fails", async () => {
+    const c = caseById("lifecycle-and-tool-safety");
+    const { session, log } = mockSession(c);
+    await assert.rejects(runDshEvictionCycle({
+      session,
+      registry: createEmptySessionTaskRegistry(c.sessionId),
+      estimator: estimatorFor(c),
+      computeRevision: stableRevision,
+      persistRegistry() { throw new Error("CAS failed"); },
+    }), /CAS failed/);
+    assert.equal(log.length, 0);
+  });
+
+  it("honors minBlockChars without mutating eligible small items", async () => {
+    const c = caseById("lifecycle-and-tool-safety");
+    const { session, log } = mockSession(c);
+    const out = await runDshEvictionCycle({
+      session,
+      registry: createEmptySessionTaskRegistry(c.sessionId),
+      estimator: estimatorFor(c),
+      computeRevision: stableRevision,
+      minBlockChars: 10_000,
+    });
+    assert.equal(out.status, "empty");
+    assert.equal(log.length, 0);
+  });
+
+  it("does not advance the registry watermark after a partial surface commit", async () => {
+    const c = caseById("lifecycle-and-tool-safety");
+    const { session, log } = mockSession(c);
+    let persistCount = 0;
+    const registries: Array<{ lastProcessedTurnSeq: number }> = [];
+    const originalAppend = session.append.bind(session);
+    let replacementCount = 0;
+    session.append = (type, data, opts) => {
+      if (opts?.surfaceOp) {
+        replacementCount += 1;
+        if (replacementCount === 2) throw new Error("partial");
+      }
+      return originalAppend(type, data, opts);
+    };
+    const out = await runDshEvictionCycle({
+      session,
+      registry: createEmptySessionTaskRegistry(c.sessionId),
+      estimator: estimatorFor(c),
+      computeRevision: stableRevision,
+      persistRegistry(registry) {
+        persistCount += 1;
+        registries.push({ lastProcessedTurnSeq: registry.lastProcessedTurnSeq });
+      },
+    });
+    assert.equal(out.result.status, "partial");
+    assert.equal(persistCount, 1);
+    assert.equal(registries.at(-1)?.lastProcessedTurnSeq, 0);
+    assert.ok(log.some((event) => event.opts?.surfaceOp !== undefined));
+  });
 });
 
 describe("describeEffectiveItems", () => {
@@ -120,9 +210,8 @@ describe("describeEffectiveItems", () => {
     const items = describeEffectiveItems(c.events, c.effectiveEventSeqs);
     const bySeq = new Map(items.map((i) => [i.seq, i]));
     assert.equal(bySeq.get(3)?.kind, "tool_call");
-    assert.equal(bySeq.get(4)?.kind, "tool_result");
-    assert.equal(bySeq.get(4)?.role, "user");
-    assert.equal(bySeq.get(5)?.role, "assistant");
+    assert.equal(bySeq.get(5)?.kind, "tool_result");
+    assert.equal(bySeq.get(5)?.role, "user");
     assert.equal(bySeq.get(18)?.turn, 4);
   });
 });

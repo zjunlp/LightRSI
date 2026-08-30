@@ -32,6 +32,7 @@ function payloadWith(events: DshLogEventWithMeta[], opts: { aborted?: boolean } 
         id: "sess-x",
         events,
         surface: { nodes: events.map((event) => event.seq), replaceGeneration: 0 },
+        append: () => ({ seq: events.length + 1 }),
       },
     },
     messages: [],
@@ -52,7 +53,11 @@ const nextStub = async (): Promise<DshPreStepDecision> => DEFERRED;
 
 const SAMPLE: DshLogEventWithMeta[] = [
   { seq: 1, type: "turn/start", data: { turn: 1 } },
-  { seq: 2, type: "user/message", data: { role: "user", content: [{ type: "text", text: "hi" }] } },
+  {
+    seq: 2,
+    type: "user/message",
+    data: { id: "msg-user-2", role: "user", content: [{ type: "text", text: "hi" }], source: { kind: "user" } },
+  },
 ];
 
 describe("registerEvictionPreStep", () => {
@@ -100,6 +105,19 @@ describe("registerEvictionPreStep", () => {
     registerEvictionPreStep(ctx, ENABLED);
     const events: DshLogEventWithMeta[] = [...SAMPLE, { seq: 3, type: "todo/write", data: {}, ignorable: true }];
     // still defers (estimator seam not wired) but reaches the seam without bailing early
+    const result = await getHandler()(payloadWith(events), nextStub);
+    assert.deepEqual(result, DEFERRED);
+  });
+
+  it("does not reject pinned DSH required log-only events", async () => {
+    const { ctx, getHandler } = mockCtx();
+    registerEvictionPreStep(ctx, ENABLED);
+    const events: DshLogEventWithMeta[] = [
+      ...SAMPLE,
+      { seq: 3, type: "request/header", data: { header: {}, reason: "initial" } },
+      { seq: 4, type: "assistant/chunk", data: { turn: 1, step: 0, chunk: {} } },
+      { seq: 5, type: "session/end-seed", data: {} },
+    ];
     const result = await getHandler()(payloadWith(events), nextStub);
     assert.deepEqual(result, DEFERRED);
   });

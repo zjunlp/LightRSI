@@ -1,6 +1,6 @@
 # Profile bundle patch: register the TokenPilot eviction plugin on the Host plane.
-# Runs in agent/pre-step. No-op until an estimator is configured and R3/R4 land —
-# it attaches to the waterfall and defers; it does not mutate the surface yet.
+# Runs in agent/pre-step. Mutation remains off until the feature, estimator,
+# eviction, and durable stateDir settings are all configured.
 - insert:
     - id: tokenpilot-dsh
       name: '@lightrsi/deepseek-harness-adapter'

@@ -171,37 +171,30 @@ function discoverToolPairs(
 
   for (const event of fixture.events) {
     if (!effective.has(event.seq)) continue;
-    if (event.type !== "tool/call" && event.type !== "tool/result") continue;
+    if (event.type !== "assistant/message" && event.type !== "tool/result") continue;
 
     const item = itemsBySeq.get(event.seq);
     assert.ok(item, `${fixture.id} ${fixtureLabel(event)} has no expected item`);
 
-    let callId: string;
-
-    if (event.type === "tool/call") {
-      const data = isObject(event.data) ? event.data : {};
-      assert.equal(
-        typeof data.callId,
-        "string",
-        `${fixture.id} ${fixtureLabel(event)} must have callId`,
-      );
-      callId = data.callId as string;
-    } else {
-      callId = resultCallId(event);
+    const callIds = event.type === "tool/result"
+      ? [resultCallId(event)]
+      : (() => {
+          const data = isObject(event.data) ? event.data : {};
+          const message = isObject(data.message) ? data.message : {};
+          const content = Array.isArray(message.content) ? message.content : [];
+          return content.flatMap((block) => (
+            isObject(block) && block.type === "tool-call" && typeof block.id === "string"
+              ? [block.id]
+              : []
+          ));
+        })();
+    if (callIds.length === 0) continue;
+    for (const callId of callIds) {
+      const pair = discovered.get(callId) ?? { callItemIds: [], resultItemIds: [] };
+      if (event.type === "assistant/message") pair.callItemIds.push(item.itemId);
+      else pair.resultItemIds.push(item.itemId);
+      discovered.set(callId, pair);
     }
-
-    const pair = discovered.get(callId) ?? {
-      callItemIds: [],
-      resultItemIds: [],
-    };
-
-    if (event.type === "tool/call") {
-      pair.callItemIds.push(item.itemId);
-    } else {
-      pair.resultItemIds.push(item.itemId);
-    }
-
-    discovered.set(callId, pair);
   }
 
   return discovered;
@@ -267,14 +260,11 @@ function validateToolPairs(
         `${fixture.id} closed pair must declare evict or keep`,
       );
 
-      for (const itemId of affectedItemIds) {
-        const item = itemsById.get(itemId);
-        assert.ok(item, `${fixture.id} ${itemId} is missing`);
-        assert.equal(
-          item.action,
-          expectedPair.action,
-          `${fixture.id} ${expectedPair.callId} must remain closed`,
-        );
+      for (const itemId of actual.callItemIds) {
+        assert.equal(itemsById.get(itemId)?.action, "keep", `${fixture.id} must preserve the tool-call envelope`);
+      }
+      for (const itemId of actual.resultItemIds) {
+        assert.equal(itemsById.get(itemId)?.action, expectedPair.action, `${fixture.id} closed result action`);
       }
     } else if (expectedPair.status === "orphan_result") {
       assert.equal(
@@ -383,6 +373,40 @@ function validateReplacements(
   }
 }
 
+function assertNativeSurfaceShape(fixture: SessionEventFixture): void {
+  const eligible = new Set(["user/message", "assistant/message", "tool/result"]);
+  const effective = new Set(fixture.effectiveEventSeqs);
+  for (const seq of effective) {
+    const event = fixture.events.find((candidate) => candidate.seq === seq);
+    assert.ok(event && eligible.has(event.type), `${fixture.id} effective seq ${seq} must be a DSH surface event`);
+  }
+  for (const event of fixture.events) {
+    if (!eligible.has(event.type)) {
+      assert.equal(event.surfaceOp, undefined, `${fixture.id} log-only ${fixtureLabel(event)} cannot carry surfaceOp`);
+      continue;
+    }
+    assert.notEqual(event.surfaceOp, undefined, `${fixture.id} ${fixtureLabel(event)} requires surfaceOp`);
+    const data = isObject(event.data) ? event.data : {};
+    const message = event.type === "user/message" ? data : isObject(data.message) ? data.message : {};
+    assert.equal(typeof message.id, "string", `${fixture.id} ${fixtureLabel(event)} requires message id`);
+    assert.ok(String(message.id).length > 0, `${fixture.id} ${fixtureLabel(event)} requires non-empty message id`);
+    assert.ok(Array.isArray(message.content), `${fixture.id} ${fixtureLabel(event)} requires message content`);
+    const source = isObject(message.source) ? message.source : {};
+    assert.equal(typeof source.kind, "string", `${fixture.id} ${fixtureLabel(event)} requires message source`);
+    const expectedRole = event.type === "assistant/message" ? "assistant" : "user";
+    assert.equal(message.role, expectedRole, `${fixture.id} ${fixtureLabel(event)} role`);
+    if (event.type === "assistant/message") {
+      assert.equal(source.kind, "model", `${fixture.id} assistant source kind`);
+      assert.equal(typeof source.provider, "string", `${fixture.id} assistant source provider`);
+      assert.equal(typeof source.model, "string", `${fixture.id} assistant source model`);
+    }
+    if (event.type === "tool/result") {
+      assert.equal(source.kind, "tool", `${fixture.id} tool result source kind`);
+      assert.equal(typeof source.callId, "string", `${fixture.id} tool result source callId`);
+    }
+  }
+}
+
 function validateFixture(fixture: SessionEventFixture): void {
   assert.ok(fixture.id.trim(), "fixture id is required");
   assert.ok(fixture.description.trim(), `${fixture.id} description is required`);
@@ -418,6 +442,7 @@ function validateFixture(fixture: SessionEventFixture): void {
   const eventsBySeq = new Map(
     fixture.events.map((event) => [event.seq, event]),
   );
+  assertNativeSurfaceShape(fixture);
 
   assertUnique(
     fixture.effectiveEventSeqs,
@@ -554,11 +579,17 @@ function validateFixtureAgainstCodec(fixture: SessionEventFixture): void {
 
     if (expected.kind === "tool_call") {
       const data = isObject(event.data) ? event.data : {};
-      const call = snapshot.toolCalls.find((candidate) =>
-        candidate.toolCallId === data.callId && candidate.anchor.turnSeq === turn,
-      );
-      assert.ok(call, `${fixture.id} ${expected.itemId} must be emitted by the codec`);
-      assert.equal(call.toolName, data.name);
+      const message = isObject(data.message) ? data.message : {};
+      const content = Array.isArray(message.content) ? message.content : [];
+      const blocks = content.filter((block) => isObject(block) && block.type === "tool-call");
+      assert.ok(blocks.length > 0, `${fixture.id} ${expected.itemId} must carry a surface tool call`);
+      for (const block of blocks) {
+        const call: (typeof snapshot.toolCalls)[number] | undefined = snapshot.toolCalls.find((candidate) =>
+          candidate.toolCallId === block.id && candidate.anchor.turnSeq === turn,
+        );
+        assert.ok(call, `${fixture.id} ${expected.itemId} must be emitted by the codec`);
+        assert.equal(call.toolName, block.name);
+      }
       continue;
     }
     if (expected.kind === "tool_result") {
@@ -579,14 +610,8 @@ function validateFixtureAgainstCodec(fixture: SessionEventFixture): void {
     assert.ok(message, `${fixture.id} ${expected.itemId} must be emitted by the codec`);
   }
 
-  const emittedItemCount = snapshot.messages.length
-    + snapshot.toolCalls.length
-    + snapshot.toolResults.length;
-  assert.equal(
-    emittedItemCount,
-    fixture.expected.items.length,
-    `${fixture.id} codec output must contain only effective semantic items`,
-  );
+  // An assistant surface event can project to both visible text and tool-call
+  // records, so projection count is not the canonical surface-node count.
   const emittedText = JSON.stringify(snapshot);
   for (const event of fixture.events) {
     if (effective.has(event.seq)) continue;

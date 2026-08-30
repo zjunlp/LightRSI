@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 
 import {
   applyEvictionTransaction,
-  findOrphanedEvictionIds,
   type AppendableSession,
   type AppendedEvent,
   type AppendOptions,
@@ -29,7 +28,7 @@ function mockSession(nodes: number[], opts: { failOnNthReplacement?: number } = 
     id: "sess-r4",
     surface: { nodes, replaceGeneration: 0 },
     append(type: string, data: unknown, appendOpts?: AppendOptions): AppendedEvent {
-      if (type === "user/message") {
+      if (type === "user/message" || type === "assistant/message" || type === "tool/result") {
         replacementCount += 1;
         if (opts.failOnNthReplacement === replacementCount) throw new Error("append failed");
       }
@@ -49,36 +48,49 @@ function planFor(targetSeqs: number[]): EvictionPlan {
     revision: REV,
     targets: targetSeqs.map((seq) => ({
       sourceEventSeq: seq,
-      role: seq === 4 ? "user" : "assistant",
-      stubText: `[evicted #${seq}]`,
+      eventType: seq === 4 ? "tool/result" : "user/message",
+      data: seq === 4
+        ? {
+            turn: 1,
+            step: 0,
+            message: {
+              id: "result-4",
+              role: "user",
+              content: [{ type: "tool-result", toolCallId: "call-4", content: [{ type: "text", text: "[evicted #4]" }] }],
+              source: { kind: "tool", callId: "call-4" },
+            },
+          }
+        : seq === 2
+          ? { id: "replacement-2", role: "user", content: [{ type: "text", text: "[evicted #2]" }], source: { kind: "plugin", plugin: "tokenpilot-dsh" } }
+          : { id: `replacement-${seq}`, role: "user", content: [{ type: "text", text: `[evicted #${seq}]` }], source: { kind: "plugin", plugin: "tokenpilot-dsh" } },
     })),
   };
 }
 const okRevision = () => REV;
 
 describe("applyEvictionTransaction", () => {
-  it("brackets replacements with start/end and replaces each target on the surface", () => {
+  it("writes only native replacement events and cites each shadowed node", () => {
     const { session, log } = mockSession([2, 3, 4, 5, 8, 18]);
     const result = applyEvictionTransaction(session, planFor([2, 3, 4, 5]), okRevision);
 
     assert.equal(result.status, "committed");
     assert.deepEqual(result.appliedSeqs, [2, 3, 4, 5]);
 
-    // start is first, end is last, both log-only.
-    assert.equal(log[0].type, "eviction/start");
-    assert.equal(log[0].opts?.ignorable, true);
-    assert.equal(log.at(-1)?.type, "eviction/end");
-    assert.equal((log.at(-1)?.data as { status: string }).status, "committed");
-
     // each replacement carries a canonical replace over its own seq + provenance.
-    const replacements = log.filter((e) => e.type === "user/message");
+    const replacements = log.filter((e) => e.opts?.surfaceOp !== undefined);
     assert.equal(replacements.length, 4);
+    assert.deepEqual(replacements.map((event) => event.type), [
+      "user/message",
+      "user/message",
+      "tool/result",
+      "user/message",
+    ]);
     for (const r of replacements) {
       const op = r.opts?.surfaceOp;
       assert.ok(op && op.op === "replace");
       assert.equal(op.start, op.end);
       assert.ok(r.opts?.sourceEventSeqs?.includes(op.start));
-      assert.ok(r.opts?.sourceEventSeqs?.includes(log[0].seq)); // references eviction/start
+      assert.deepEqual(r.opts?.sourceEventSeqs, [op.start]);
     }
   });
 
@@ -106,7 +118,7 @@ describe("applyEvictionTransaction", () => {
     assert.deepEqual(result.appliedSeqs, [2, 3]); // only landed ones count
     assert.ok(result.failedSeqs.includes(4));
     assert.ok(result.failedSeqs.includes(5));
-    assert.equal((log.at(-1)?.data as { status: string }).status, "partial");
+    assert.equal(log.filter((event) => event.opts?.surfaceOp !== undefined).length, 2);
   });
 
   it("is empty for an empty plan and never appends", () => {
@@ -114,25 +126,5 @@ describe("applyEvictionTransaction", () => {
     const result = applyEvictionTransaction(session, planFor([]), okRevision);
     assert.equal(result.status, "empty");
     assert.equal(log.length, 0);
-  });
-});
-
-describe("findOrphanedEvictionIds", () => {
-  it("finds a start with no matching end", () => {
-    const events = [
-      { type: "eviction/start", data: { evictionId: "a" } },
-      { type: "eviction/applied", data: { evictionId: "a" } },
-      { type: "eviction/end", data: { evictionId: "a" } },
-      { type: "eviction/start", data: { evictionId: "b" } }, // interrupted
-    ];
-    assert.deepEqual(findOrphanedEvictionIds(events), ["b"]);
-  });
-
-  it("returns nothing when all transactions closed", () => {
-    const events = [
-      { type: "eviction/start", data: { evictionId: "a" } },
-      { type: "eviction/end", data: { evictionId: "a" } },
-    ];
-    assert.deepEqual(findOrphanedEvictionIds(events), []);
   });
 });

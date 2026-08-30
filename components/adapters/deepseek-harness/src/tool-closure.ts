@@ -1,10 +1,10 @@
 /**
  * Tool call/result closure (Task-R3, part 1).
  *
- * Groups effective tool events by `callId` and classifies each group's closure
- * status. Only a strictly closed pair (exactly one call + one result) is safe
- * to evict, and only as a unit. Everything else — an orphan result, a call with
- * no result, or a duplicated call id — is unsafe and must be deferred.
+ * Groups model-visible tool protocol blocks by `callId`. DSH's durable
+ * `tool/call` event is log-only; the actual call on the canonical surface is a
+ * `tool-call` block inside `assistant/message`. Results are `tool/result`
+ * surface events. Only a strict one-call/one-result pair is safe to rewrite.
  *
  * This mirrors the pairing scheme the shared fixture oracle uses
  * (tests/session-event-fixtures.test.ts): tool/call → data.callId; tool/result
@@ -52,9 +52,19 @@ export function resultCallId(event: ClosureEvent): string | undefined {
   return undefined;
 }
 
-function callCallId(event: ClosureEvent): string | undefined {
+/** Resolve all tool-call blocks carried by a surface assistant message. */
+export function assistantCallIds(event: ClosureEvent): string[] {
   const data = isObject(event.data) ? event.data : {};
-  return typeof data.callId === "string" && data.callId.length > 0 ? data.callId : undefined;
+  const message = isObject(data.message) ? data.message : {};
+  const content = Array.isArray(message.content) ? message.content : [];
+  return content.flatMap((block) => (
+    isObject(block)
+      && block.type === "tool-call"
+      && typeof block.id === "string"
+      && block.id.length > 0
+      ? [block.id]
+      : []
+  ));
 }
 
 export function classifyPair(callSeqs: readonly number[], resultSeqs: readonly number[]): ToolPairStatus {
@@ -85,9 +95,10 @@ export function buildToolPairs(
   for (const event of events) {
     if (!effective.has(event.seq)) continue;
 
-    if (event.type === "tool/call") {
-      const id = callCallId(event);
-      if (id) (calls.get(id) ?? calls.set(id, []).get(id)!).push(event.seq);
+    if (event.type === "assistant/message") {
+      for (const id of assistantCallIds(event)) {
+        (calls.get(id) ?? calls.set(id, []).get(id)!).push(event.seq);
+      }
     } else if (event.type === "tool/result") {
       const id = resultCallId(event);
       if (id) (results.get(id) ?? results.set(id, []).get(id)!).push(event.seq);

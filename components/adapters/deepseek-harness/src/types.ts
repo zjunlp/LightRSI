@@ -32,10 +32,11 @@ export type DshContentBlock =
 
 /** Mirror of DSH `Message` (packages/llm/llm/src/message.ts:135). */
 export interface DshMessage {
+  id: string;
   role: "system" | "user" | "assistant";
   content: DshContentBlock[];
   /** `source.kind` distinguishes human `user` from synthetic `plugin` injection. */
-  source?: { kind: string; callId?: DshCallId; [k: string]: unknown };
+  source: { kind: string; callId?: DshCallId; [k: string]: unknown };
 }
 
 /**
@@ -95,6 +96,10 @@ export interface DshSession {
   /** Append-only durable event log (session.events). */
   readonly events: readonly DshLogEventWithMeta[];
   readonly surface: DshSessionSurface;
+  append(type: string, data: unknown, options?: {
+    surfaceOp?: "append" | { op: "replace"; start: number; end: number };
+    sourceEventSeqs?: readonly number[];
+  }): { seq: number };
 }
 
 export interface DshAgent {

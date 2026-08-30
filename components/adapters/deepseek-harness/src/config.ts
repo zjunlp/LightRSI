@@ -30,6 +30,8 @@ export type TokenPilotDshConfig = {
   /** Master switch for the whole TokenPilot DSH integration. Default OFF (R5). */
   enabled: boolean;
   logLevel: "info" | "debug";
+  /** LightRSI-owned durable state root for task registry CAS. */
+  stateDir?: string;
   taskStateEstimator: DshEstimatorConfig;
   eviction: {
     enabled: boolean;
@@ -50,6 +52,7 @@ export type TokenPilotDshConfig = {
 export const DSH_CONFIG_DEFAULTS = {
   enabled: false,
   logLevel: "info" as const,
+  stateDir: undefined,
   estimator: {
     enabled: false,
     requestTimeoutMs: 60_000,
@@ -119,6 +122,7 @@ export function normalizeDshConfig(raw: unknown): TokenPilotDshConfig {
   return {
     enabled: boolValue(r.enabled, d.enabled),
     logLevel: enumValue(r.logLevel, ["info", "debug"] as const) ?? d.logLevel,
+    stateDir: stringValue(r.stateDir),
     taskStateEstimator: normalizeEstimator(r.taskStateEstimator),
     eviction: {
       enabled: boolValue(eviction.enabled, d.eviction.enabled),

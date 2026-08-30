@@ -11,10 +11,8 @@
  * satisfies the subset used here. `inject` tells DSH which services to make
  * available before `apply` runs.
  *
- * NOTE: master flag OFF installs nothing (no listener). Even ON, the handler
- * is a safe no-op that defers on `agent/pre-step` until R3/R4 land — it never
- * mutates the surface. So installing this plugin is observable (it attaches to
- * pre-step) but has no eviction effect yet.
+ * The master flag remains default-off. When enabled, mutation additionally
+ * requires a configured estimator and durable LightRSI state directory.
  */
 
 import { normalizeDshConfig } from "./config.js";

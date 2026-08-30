@@ -31,7 +31,14 @@ function mockWaterfall() {
 
 function payload(): DshPreStepPayload {
   return {
-    agent: { session: { id: "s", events: [], surface: { nodes: [], replaceGeneration: 0 } } },
+    agent: {
+      session: {
+        id: "s",
+        events: [],
+        surface: { nodes: [], replaceGeneration: 0 },
+        append: () => ({ seq: 0 }),
+      },
+    },
     messages: [],
     turn: 1,
     step: 0,
@@ -83,5 +90,18 @@ describe("pre-step listener order (§1.3: eviction before compaction)", () => {
     ctx.on("agent/pre-step", other); // no prepend → appended
     assert.equal(handlers[0], compaction);
     assert.equal(handlers[1], other);
+  });
+
+  it("honors runEvictionBeforeCompaction=false", () => {
+    const { ctx, handlers } = mockWaterfall();
+    const compaction: Handler = async (_p, next) => next();
+    ctx.on("agent/pre-step", compaction);
+    registerEvictionPreStep(ctx, normalizeDshConfig({
+      enabled: true,
+      eviction: { enabled: true },
+      compaction: { runEvictionBeforeCompaction: false },
+    }));
+    assert.equal(handlers[0], compaction);
+    assert.equal(handlers.length, 2);
   });
 });

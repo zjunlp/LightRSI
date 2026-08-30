@@ -32,16 +32,21 @@ function caseById(id: string) {
 }
 
 function itemsFromExpected(c: ReturnType<typeof caseById>): SafetyItem[] {
-  const callIdBySeq = new Map<number, string>();
+  const callIdsBySeq = new Map<number, string[]>();
   for (const [callId, pair] of buildToolPairs(c.events, c.effectiveEventSeqs)) {
-    for (const seq of [...pair.callSeqs, ...pair.resultSeqs]) callIdBySeq.set(seq, callId);
+    for (const seq of [...pair.callSeqs, ...pair.resultSeqs]) {
+      const callIds = callIdsBySeq.get(seq) ?? [];
+      callIds.push(callId);
+      callIdsBySeq.set(seq, callIds);
+    }
   }
   return c.expected.items.map((it) => ({
     sourceEventSeq: it.sourceEventSeq,
     kind: it.kind,
     taskState: it.taskState,
     current: it.current,
-    callId: callIdBySeq.get(it.sourceEventSeq),
+    callIds: callIdsBySeq.get(it.sourceEventSeq),
+    chars: 1,
   }));
 }
 
@@ -78,6 +83,39 @@ describe("tool closure classification", () => {
     assert.equal(classifyPair([1], []), "missing_result");
     assert.equal(classifyPair([1, 3], [2]), "duplicate_call");
     assert.equal(classifyPair([1], [2, 4]), "duplicate_result");
+  });
+
+  it("keeps every result when one shared assistant call envelope is incomplete", () => {
+    const events = [
+      {
+        seq: 1,
+        type: "assistant/message",
+        data: {
+          message: {
+            content: [
+              { type: "tool-call", id: "call-a" },
+              { type: "tool-call", id: "call-b" },
+            ],
+          },
+        },
+      },
+      {
+        seq: 2,
+        type: "tool/result",
+        data: {
+          message: {
+            source: { callId: "call-a" },
+            content: [{ type: "tool-result", toolCallId: "call-a", content: [] }],
+          },
+        },
+      },
+    ];
+    const decision = applySafetyPolicy([
+      { sourceEventSeq: 1, kind: "tool_call", taskState: "completed", current: false, callIds: ["call-a", "call-b"], chars: 10 },
+      { sourceEventSeq: 2, kind: "tool_result", taskState: "completed", current: false, callIds: ["call-a"], chars: 500 },
+    ], [1, 2], events);
+    assert.equal(decision.action.get(2), "keep");
+    assert.deepEqual(decision.deferredCallIds, ["call-a", "call-b"]);
   });
 });
 

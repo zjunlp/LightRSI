@@ -19,6 +19,7 @@
           "type": "user/message",
           "surfaceOp": "append",
           "data": {
+            "id": "message-user-2",
             "role": "user",
             "content": [
               {
@@ -33,6 +34,36 @@
         },
         {
           "seq": 3,
+          "type": "assistant/message",
+          "surfaceOp": "append",
+          "data": {
+            "turn": 1,
+            "step": 0,
+            "message": {
+              "id": "message-assistant-3",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "KEEP_ME_44444444-4444-4444-8444-444444444444"
+                },
+                {
+                  "type": "tool-call",
+                  "id": "call_completed",
+                  "name": "fixture_lookup",
+                  "arguments": "{\"query\":\"KEEP_ME_22222222-2222-4222-8222-222222222222\"}"
+                }
+              ],
+              "source": {
+                "kind": "model",
+                "provider": "fixture-provider",
+                "model": "fixture-model"
+              }
+            }
+          }
+        },
+        {
+          "seq": 4,
           "type": "tool/call",
           "data": {
             "turn": 1,
@@ -43,16 +74,17 @@
           }
         },
         {
-          "seq": 4,
+          "seq": 5,
           "type": "tool/result",
           "surfaceOp": "append",
           "sourceEventSeqs": [
-            3
+            4
           ],
           "data": {
             "turn": 1,
             "step": 0,
             "message": {
+              "id": "message-result-5",
               "role": "user",
               "content": [
                 {
@@ -69,32 +101,6 @@
               "source": {
                 "kind": "tool",
                 "callId": "call_completed"
-              }
-            }
-          }
-        },
-        {
-          "seq": 5,
-          "type": "assistant/message",
-          "surfaceOp": "append",
-          "sourceEventSeqs": [
-            2,
-            3,
-            4
-          ],
-          "data": {
-            "turn": 1,
-            "step": 0,
-            "message": {
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "text",
-                  "text": "EVICT_ME_44444444-4444-4444-8444-444444444444"
-                }
-              ],
-              "source": {
-                "kind": "assistant"
               }
             }
           }
@@ -118,6 +124,7 @@
           "type": "user/message",
           "surfaceOp": "append",
           "data": {
+            "id": "message-user-8",
             "role": "user",
             "content": [
               {
@@ -141,6 +148,7 @@
             "turn": 2,
             "step": 0,
             "message": {
+              "id": "message-assistant-9",
               "role": "assistant",
               "content": [
                 {
@@ -149,7 +157,9 @@
                 }
               ],
               "source": {
-                "kind": "assistant"
+                "kind": "model",
+                "provider": "fixture-provider",
+                "model": "fixture-model"
               }
             }
           }
@@ -176,6 +186,7 @@
             "turn": 3,
             "step": 0,
             "message": {
+              "id": "message-result-12",
               "role": "user",
               "content": [
                 {
@@ -198,13 +209,34 @@
         },
         {
           "seq": 13,
-          "type": "tool/call",
+          "type": "assistant/message",
+          "surfaceOp": "append",
           "data": {
             "turn": 3,
             "step": 0,
-            "callId": "call_duplicate",
-            "name": "fixture_lookup",
-            "arguments": "{\"query\":\"KEEP_ME_88888888-8888-4888-8888-888888888888\"}"
+            "message": {
+              "id": "message-assistant-13",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool-call",
+                  "id": "call_duplicate",
+                  "name": "fixture_lookup",
+                  "arguments": "{\"query\":\"KEEP_ME_88888888-8888-4888-8888-888888888888\"}"
+                },
+                {
+                  "type": "tool-call",
+                  "id": "call_duplicate",
+                  "name": "fixture_lookup",
+                  "arguments": "{\"query\":\"KEEP_ME_99999999-9999-4999-8999-999999999999\"}"
+                }
+              ],
+              "source": {
+                "kind": "model",
+                "provider": "fixture-provider",
+                "model": "fixture-model"
+              }
+            }
           }
         },
         {
@@ -230,6 +262,7 @@
             "turn": 3,
             "step": 0,
             "message": {
+              "id": "message-result-15",
               "role": "user",
               "content": [
                 {
@@ -269,6 +302,7 @@
           "type": "user/message",
           "surfaceOp": "append",
           "data": {
+            "id": "message-user-18",
             "role": "user",
             "content": [
               {
@@ -285,13 +319,11 @@
       "effectiveEventSeqs": [
         2,
         3,
-        4,
         5,
         8,
         9,
         12,
         13,
-        14,
         15,
         18
       ],
@@ -307,27 +339,18 @@
             "current": false
           },
           {
-            "itemId": "event-3-tool-call",
+            "itemId": "event-3-message",
             "sourceEventSeq": 3,
             "kind": "tool_call",
             "taskId": "task-completed",
             "taskState": "completed",
-            "action": "evict",
+            "action": "keep",
             "current": false
           },
           {
-            "itemId": "event-4-tool-result",
-            "sourceEventSeq": 4,
-            "kind": "tool_result",
-            "taskId": "task-completed",
-            "taskState": "completed",
-            "action": "evict",
-            "current": false
-          },
-          {
-            "itemId": "event-5-message",
+            "itemId": "event-5-tool-result",
             "sourceEventSeq": 5,
-            "kind": "message",
+            "kind": "tool_result",
             "taskId": "task-completed",
             "taskState": "completed",
             "action": "evict",
@@ -370,15 +393,6 @@
             "current": false
           },
           {
-            "itemId": "event-14-tool-call",
-            "sourceEventSeq": 14,
-            "kind": "tool_call",
-            "taskId": "task-duplicate-tool",
-            "taskState": "completed",
-            "action": "keep",
-            "current": false
-          },
-          {
             "itemId": "event-15-tool-result",
             "sourceEventSeq": 15,
             "kind": "tool_result",
@@ -401,10 +415,10 @@
           {
             "callId": "call_completed",
             "callItemIds": [
-              "event-3-tool-call"
+              "event-3-message"
             ],
             "resultItemIds": [
-              "event-4-tool-result"
+              "event-5-tool-result"
             ],
             "status": "closed",
             "action": "evict"
@@ -422,7 +436,7 @@
             "callId": "call_duplicate",
             "callItemIds": [
               "event-13-tool-call",
-              "event-14-tool-call"
+              "event-13-tool-call"
             ],
             "resultItemIds": [
               "event-15-tool-result"
@@ -452,6 +466,7 @@
           "type": "user/message",
           "surfaceOp": "append",
           "data": {
+            "id": "message-user-compaction-2",
             "role": "user",
             "content": [
               {
@@ -475,6 +490,7 @@
             "turn": 1,
             "step": 0,
             "message": {
+              "id": "message-assistant-compaction-3",
               "role": "assistant",
               "content": [
                 {
@@ -483,7 +499,9 @@
                 }
               ],
               "source": {
-                "kind": "assistant"
+                "kind": "model",
+                "provider": "fixture-provider",
+                "model": "fixture-model"
               }
             }
           }
@@ -544,6 +562,7 @@
             6
           ],
           "data": {
+            "id": "message-checkpoint-7",
             "role": "user",
             "content": [
               {
@@ -587,6 +606,7 @@
           "type": "user/message",
           "surfaceOp": "append",
           "data": {
+            "id": "message-user-compaction-11",
             "role": "user",
             "content": [
               {
@@ -647,6 +667,7 @@
           "type": "user/message",
           "surfaceOp": "append",
           "data": {
+            "id": "message-user-damaged-2",
             "role": "user",
             "content": [
               {

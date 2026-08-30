@@ -8,6 +8,7 @@ describe("normalizeDshConfig", () => {
     const c = normalizeDshConfig({});
     assert.equal(c.enabled, false);
     assert.equal(c.logLevel, "info");
+    assert.equal(c.stateDir, undefined);
     assert.equal(c.taskStateEstimator.enabled, false);
     assert.equal(c.taskStateEstimator.requestTimeoutMs, DSH_CONFIG_DEFAULTS.estimator.requestTimeoutMs);
     assert.equal(c.taskStateEstimator.batchTurns, 5);
@@ -51,6 +52,7 @@ describe("normalizeDshConfig", () => {
   it("passes a fully-specified valid config through", () => {
     const c = normalizeDshConfig({
       enabled: true,
+      stateDir: " /tmp/lightrsi-dsh-test ",
       logLevel: "debug",
       taskStateEstimator: {
         enabled: true,
@@ -68,6 +70,7 @@ describe("normalizeDshConfig", () => {
       compaction: { runEvictionBeforeCompaction: false },
     });
     assert.equal(c.enabled, true);
+    assert.equal(c.stateDir, "/tmp/lightrsi-dsh-test");
     assert.equal(c.taskStateEstimator.baseUrl, "https://api.example.com");
     assert.equal(c.taskStateEstimator.batchTurns, 8);
     assert.equal(c.taskStateEstimator.inputMode, "completed_summary_plus_active_turns");
