@@ -31,6 +31,7 @@ import {
 import {
   readRecentCodexCacheAuditRecordsForSession,
 } from "../../../../adapters/codex/src/cache-audit.js";
+import { createCodexContextCleanerBridge } from "../../../../adapters/codex/src/context-cleaner/index.js";
 import {
   applyStandardRuntimeModeConfig,
   buildSessionReportResult,
@@ -40,6 +41,8 @@ import {
 } from "./shared.js";
 import { handleStandaloneVisualCommandWithSelection } from "./visual.js";
 import type { CliHostPathOverrides } from "../context-store.js";
+import type { CleanCommandBackend } from "../clean.js";
+import { createHostCleanCommandBackend } from "./cleaner.js";
 
 const CODEX_REDUCTION_PASS_NAMES = [
   "readStateCompaction",
@@ -63,6 +66,27 @@ function resolveCodexPaths(pathOverrides?: CliHostPathOverrides): {
 
 async function loadConfig(pathOverrides?: CliHostPathOverrides): Promise<Record<string, unknown>> {
   return loadTokenPilotCodexConfig(resolveCodexPaths(pathOverrides).tokenPilotConfigPath) as unknown as Record<string, unknown>;
+}
+
+export async function createCodexCleanCommandBackend(
+  pathOverrides?: CliHostPathOverrides,
+): Promise<CleanCommandBackend | undefined> {
+  const config = await loadTokenPilotCodexConfig(resolveCodexPaths(pathOverrides).tokenPilotConfigPath);
+  const stateDir = resolveCodexStateDir(config as unknown as Record<string, unknown>);
+  if (!stateDir) return undefined;
+  return createHostCleanCommandBackend({
+    stateDir,
+    recommendationEnabled: config.taskStateEstimator.enabled,
+    recommendationConfig: {
+      baseUrl: config.taskStateEstimator.baseUrl,
+      apiKey: config.taskStateEstimator.apiKey,
+      model: config.taskStateEstimator.model,
+      requestTimeoutMs: config.taskStateEstimator.requestTimeoutMs,
+    },
+    createBridge(controlPlane) {
+      return createCodexContextCleanerBridge({ stateDir, controlPlane });
+    },
+  });
 }
 
 async function writeConfig(nextConfig: Record<string, unknown>, pathOverrides?: CliHostPathOverrides): Promise<void> {
