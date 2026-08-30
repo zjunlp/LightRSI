@@ -124,6 +124,7 @@ export interface DshPluginContext {
   on(
     event: "agent/pre-step",
     handler: (payload: DshPreStepPayload, next: DshPreStepNext) => Promise<DshPreStepDecision>,
+    options?: { prepend?: boolean },
   ): void;
   tokenMeter: DshTokenMeter;
 }
