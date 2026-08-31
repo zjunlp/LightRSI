@@ -23,12 +23,30 @@ import type {
 function createSession(
   events: readonly DshLogEventWithMeta[],
 ): DshSession {
+  const nextSeq =
+    events.reduce(
+      (highest, event) =>
+        Math.max(highest, event.seq),
+      -1,
+    ) + 1;
+
   return {
     id: "session-projection-test",
+
     events,
+
     surface: {
+      nodes: [],
       replaceGeneration: 1,
     },
+
+    append: (
+      _type,
+      _data,
+      _options,
+    ) => ({
+      seq: nextSeq,
+    }),
   };
 }
 
@@ -100,7 +118,8 @@ function createFullSeed():
         content: [
           {
             type: "text",
-            text: "A completed task that may be evicted.",
+            text:
+              "A completed task that may be evicted.",
           },
         ],
       },
@@ -154,12 +173,20 @@ describe("TokenPilot session projection", () => {
       lastTransaction: null,
     });
 
-    assert.equal(definition.key, "tokenpilot");
-    assert.equal(definition.stateVersion, 1);
+    assert.equal(
+      definition.key,
+      "tokenpilot",
+    );
+
+    assert.equal(
+      definition.stateVersion,
+      1,
+    );
   });
 
   it("replays the complete seed into evidence-backed applied state", () => {
-    const projection = replay(createFullSeed());
+    const projection =
+      replay(createFullSeed());
 
     assert.deepEqual(projection, {
       enabled: true,
@@ -183,15 +210,20 @@ describe("TokenPilot session projection", () => {
     const definition =
       createTokenPilotProjectionDefinition(true);
 
-    const initial = definition.init();
+    const initial =
+      definition.init();
 
-    const next = definition.apply(initial, {
-      seq: 1,
-      type: "turn/start",
-      data: {
-        turn: 1,
-      },
-    });
+    const next =
+      definition.apply(
+        initial,
+        {
+          seq: 1,
+          type: "turn/start",
+          data: {
+            turn: 1,
+          },
+        },
+      );
 
     assert.equal(
       next,
@@ -229,10 +261,11 @@ describe("TokenPilot session projection", () => {
       },
     } as unknown as DshLogEventWithMeta;
 
-    const projection = definition.apply(
-      definition.init(),
-      event,
-    );
+    const projection =
+      definition.apply(
+        definition.init(),
+        event,
+      );
 
     assert.deepEqual(projection, {
       enabled: true,
@@ -279,7 +312,12 @@ describe("TokenPilot session projection", () => {
       );
 
     assert.ok(registered);
-    assert.equal(registered.key, "tokenpilot");
+
+    assert.equal(
+      registered.key,
+      "tokenpilot",
+    );
+
     assert.equal(
       registered.init().enabled,
       true,
@@ -287,15 +325,23 @@ describe("TokenPilot session projection", () => {
 
     dispose();
 
-    assert.equal(disposed, true);
+    assert.equal(
+      disposed,
+      true,
+    );
   });
 });
 
 describe("TokenPilot status command", () => {
   it("returns rich state and its authoritative source event", async () => {
-    const events = createFullSeed();
-    const session = createSession(events);
-    const projection = replay(events);
+    const events =
+      createFullSeed();
+
+    const session =
+      createSession(events);
+
+    const projection =
+      replay(events);
 
     let registered:
       | TokenPilotCommandDefinition
@@ -304,35 +350,39 @@ describe("TokenPilot status command", () => {
     let disposed = false;
     let snapshotCalls = 0;
 
-    const ctx: TokenPilotCommandContext = {
-      commands: {
-        register: (definition) => {
-          registered = definition;
+    const ctx:
+      TokenPilotCommandContext = {
+        commands: {
+          register: (definition) => {
+            registered = definition;
 
-          return () => {
-            disposed = true;
-          };
+            return () => {
+              disposed = true;
+            };
+          },
         },
-      },
 
-      sessionProjections: {
-        snapshot: (receivedSession) => {
-          snapshotCalls += 1;
-
-          assert.equal(
+        sessionProjections: {
+          snapshot: (
             receivedSession,
-            session,
-          );
+          ) => {
+            snapshotCalls += 1;
 
-          return {
-            asOfSeq: 4,
-            values: {
-              tokenpilot: projection,
-            },
-          };
+            assert.equal(
+              receivedSession,
+              session,
+            );
+
+            return {
+              asOfSeq: 4,
+              values: {
+                tokenpilot:
+                  projection,
+              },
+            };
+          },
         },
-      },
-    };
+      };
 
     const dispose =
       registerTokenPilotCommands(ctx);
@@ -353,21 +403,25 @@ describe("TokenPilot status command", () => {
      * The mock agent intentionally exposes only a session.
      * There is no prompt(), run(), or model-turn method.
      */
-    const result = await registered.handler({
-      commandId: "command-status-1",
+    const result =
+      await registered.handler({
+        commandId:
+          "command-status-1",
 
-      agent: {
-        session,
-      },
+        agent: {
+          session,
+        },
 
-      rawInput: "",
+        rawInput: "",
 
-      signal: {
-        aborted: false,
-      },
-    });
+        signal: {
+          aborted: false,
+        },
+      });
 
-    if (result.kind !== "success") {
+    if (
+      result.kind !== "success"
+    ) {
       assert.fail(result.text);
     }
 
@@ -401,41 +455,52 @@ describe("TokenPilot status command", () => {
       /authoritative event seq: 3/u,
     );
 
-    assert.equal(snapshotCalls, 1);
+    assert.equal(
+      snapshotCalls,
+      1,
+    );
 
     dispose();
 
-    assert.equal(disposed, true);
+    assert.equal(
+      disposed,
+      true,
+    );
   });
 
   it("rejects unexpected command arguments before reading state", () => {
-    const session = createSession([]);
+    const session =
+      createSession([]);
 
-    const ctx: TokenPilotCommandContext = {
-      commands: {
-        register: () => () => {},
-      },
-
-      sessionProjections: {
-        snapshot: () => {
-          throw new Error(
-            "snapshot must not be read for invalid input",
-          );
+    const ctx:
+      TokenPilotCommandContext = {
+        commands: {
+          register:
+            () => () => {},
         },
-      },
-    };
+
+        sessionProjections: {
+          snapshot: () => {
+            throw new Error(
+              "snapshot must not be read for invalid input",
+            );
+          },
+        },
+      };
 
     const result =
       executeTokenPilotStatusCommand(
         ctx,
         {
-          commandId: "command-invalid-1",
+          commandId:
+            "command-invalid-1",
 
           agent: {
             session,
           },
 
-          rawInput: " unexpected",
+          rawInput:
+            " unexpected",
 
           signal: {
             aborted: false,
@@ -445,31 +510,36 @@ describe("TokenPilot status command", () => {
 
     assert.deepEqual(result, {
       kind: "error",
-      text: "Usage: /tokenpilot-status",
+      text:
+        "Usage: /tokenpilot-status",
     });
   });
 
   it("reports unavailable projection state without starting a model turn", () => {
-    const session = createSession([]);
+    const session =
+      createSession([]);
 
-    const ctx: TokenPilotCommandContext = {
-      commands: {
-        register: () => () => {},
-      },
+    const ctx:
+      TokenPilotCommandContext = {
+        commands: {
+          register:
+            () => () => {},
+        },
 
-      sessionProjections: {
-        snapshot: () => ({
-          asOfSeq: -1,
-          values: {},
-        }),
-      },
-    };
+        sessionProjections: {
+          snapshot: () => ({
+            asOfSeq: -1,
+            values: {},
+          }),
+        },
+      };
 
     const result =
       executeTokenPilotStatusCommand(
         ctx,
         {
-          commandId: "command-empty-1",
+          commandId:
+            "command-empty-1",
 
           agent: {
             session,
@@ -491,27 +561,31 @@ describe("TokenPilot status command", () => {
   });
 
   it("stops immediately when the command is cancelled", () => {
-    const session = createSession([]);
+    const session =
+      createSession([]);
 
-    const ctx: TokenPilotCommandContext = {
-      commands: {
-        register: () => () => {},
-      },
-
-      sessionProjections: {
-        snapshot: () => {
-          throw new Error(
-            "cancelled command must not read a snapshot",
-          );
+    const ctx:
+      TokenPilotCommandContext = {
+        commands: {
+          register:
+            () => () => {},
         },
-      },
-    };
+
+        sessionProjections: {
+          snapshot: () => {
+            throw new Error(
+              "cancelled command must not read a snapshot",
+            );
+          },
+        },
+      };
 
     const result =
       executeTokenPilotStatusCommand(
         ctx,
         {
-          commandId: "command-cancelled-1",
+          commandId:
+            "command-cancelled-1",
 
           agent: {
             session,
