@@ -1,35 +1,124 @@
 /**
  * TokenPilot DeepSeek Harness plugin entry (Cordis).
  *
- * DSH's plugin loader calls `apply(ctx, config)` with the live plugin context
- * and the profile/bundle config patch. This module is intentionally tiny: it
- * normalizes config and, when enabled, registers the eviction handler on
- * `agent/pre-step`. Everything else lives in the sibling modules.
+ * The existing eviction implementation remains isolated in eviction-engine.
+ * This entry only normalizes configuration and wires the available runtime
+ * capabilities together.
  *
- * `ctx` is typed against the structural `DshPluginContext` bridge, so this
- * package needs no `@deepseek-ai/cordis` import — the real Cordis context
- * satisfies the subset used here. `inject` tells DSH which services to make
- * available before `apply` runs.
- *
- * The master flag remains default-off. When enabled, mutation additionally
- * requires a configured estimator and durable LightRSI state directory.
+ * Projection and command services are optional. They are acquired through
+ * ctx.inject() so headless compositions without those services still load.
  */
 
 import { normalizeDshConfig } from "./config.js";
-import { registerEvictionPreStep } from "./eviction-engine.js";
-import type { DshPluginContext } from "./types.js";
+
+import {
+  registerTokenPilotCommands,
+  type TokenPilotCommandContext,
+} from "./commands.js";
+
+import {
+  registerEvictionPreStep,
+} from "./eviction-engine.js";
+
+import {
+  registerTokenPilotProjection,
+  type TokenPilotProjectionContext,
+} from "./projection.js";
+
+import type {
+  DshPluginContext,
+} from "./types.js";
 
 /** Cordis plugin name. */
 export const name = "tokenpilot-dsh";
 
-/** Host services DSH must provide before `apply` runs. */
+/**
+ * tokenMeter remains the only mandatory service.
+ *
+ * sessionProjections and commands are optional capabilities acquired through
+ * ctx.inject(), so this change does not alter the existing Cordis bundle.
+ */
 export const inject = ["tokenMeter"];
 
+type TokenPilotUiContext =
+  TokenPilotProjectionContext &
+  TokenPilotCommandContext;
+
+interface DshOptionalCapabilityHost {
+  inject(
+    services: readonly [
+      "sessionProjections",
+      "commands",
+    ],
+    callback: (
+      ctx: TokenPilotUiContext,
+    ) => void,
+  ): void;
+}
+
+/**
+ * Register the read-only whole-session projection and human status command
+ * when the host composition provides both optional services.
+ */
+function registerTokenPilotUi(
+  ctx: DshPluginContext,
+  enabled: boolean,
+): void {
+  const optionalCtx = ctx as DshPluginContext & {
+    inject?: DshOptionalCapabilityHost["inject"];
+  };
+
+  if (typeof optionalCtx.inject !== "function") {
+    return;
+  }
+
+  optionalCtx.inject(
+    [
+      "sessionProjections",
+      "commands",
+    ],
+    (featureCtx) => {
+      registerTokenPilotProjection(
+        featureCtx,
+        enabled,
+      );
+
+      registerTokenPilotCommands(
+        featureCtx,
+      );
+    },
+  );
+}
+
 /** Cordis plugin entry. */
-export function apply(ctx: DshPluginContext, rawConfig?: unknown): void {
-  const config = normalizeDshConfig(rawConfig);
-  if (!config.enabled) return; // master flag off: attach nothing
-  registerEvictionPreStep(ctx, config);
+export function apply(
+  ctx: DshPluginContext,
+  rawConfig?: unknown,
+): void {
+  const config =
+    normalizeDshConfig(rawConfig);
+
+  /*
+   * The read-only projection and status command can report disabled state.
+   * They never create a model turn or mutate the session surface.
+   */
+  registerTokenPilotUi(
+    ctx,
+    config.enabled,
+  );
+
+  /*
+   * The existing mutation path remains strictly default-off.
+   * No eviction handler is attached while the master flag is disabled.
+   */
+  if (!config.enabled) {
+    return;
+  }
+
+  registerEvictionPreStep(
+    ctx,
+    config,
+  );
 }
 
 export default apply;
