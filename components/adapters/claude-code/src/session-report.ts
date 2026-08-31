@@ -17,6 +17,10 @@ import {
   loadClaudeCodeSessionSnapshot,
   resolveLatestClaudeCodeSessionId,
 } from "./session-state.js";
+import {
+  readClaudeCleanerObservability,
+  type ClaudeCleanerObservability,
+} from "./context-cleaner/observability.js";
 
 export type ClaudeCodeSessionTopology = {
   sessionId: string;
@@ -38,6 +42,23 @@ export type ClaudeCodeSessionTopology = {
   updatedAt?: string;
   turnCount: number;
 };
+
+function formatCleanerSavings(
+  value: ClaudeCleanerObservability["savings"]["estimated"],
+  availability: ClaudeCleanerObservability["availability"],
+): string {
+  if (!value) return availability === "degraded" ? "unknown" : "none";
+  return `${value.tokens === null ? "tokens unavailable" : `${value.tokens} tokens`}, ${value.chars} chars`;
+}
+
+function buildClaudeCleanerReportLines(observation: ClaudeCleanerObservability): string[] {
+  return [
+    `- Cleaner estimated savings: ${formatCleanerSavings(observation.savings.estimated, observation.availability)}`,
+    `- Cleaner scheduled savings: ${formatCleanerSavings(observation.savings.scheduled, observation.availability)}`,
+    `- Cleaner applied savings: ${formatCleanerSavings(observation.savings.applied, observation.availability)}`,
+    `- Cleaner fallback count: ${observation.fallbackCount ?? "unknown"}`,
+  ];
+}
 
 export async function resolveClaudeCodeSessionTopology(
   stateDir: string,
@@ -104,8 +125,11 @@ export async function renderClaudeCodeSessionReport(stateDir: string, sessionRef
   const cacheAuditSummary = cacheAuditRecords.length > 0
     ? summarizeClaudeCodeCacheAudit(cacheAuditRecords)
     : null;
+  const cleanerReportLines = buildClaudeCleanerReportLines(
+    await readClaudeCleanerObservability({ stateDir, sessionId: topology.sessionId }),
+  );
 
-  return renderSessionReport({
+  const baseReport = await renderSessionReport({
     stateDir,
     title: "TokenPilot Claude Code report:",
     sessionId: topology.sessionId,
@@ -117,4 +141,5 @@ export async function renderClaudeCodeSessionReport(stateDir: string, sessionRef
       readAggregate: readUxSessionAggregate,
     },
   });
+  return `${baseReport}\n${cleanerReportLines.join("\n")}`;
 }

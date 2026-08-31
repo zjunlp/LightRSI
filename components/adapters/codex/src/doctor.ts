@@ -28,8 +28,14 @@ import {
   resolveCodexTaskStateEstimator,
   type CodexEstimatorDiagnostic,
 } from "./context-rewrite/estimator-config.js";
+import {
+  emptyCodexCleanerObservability,
+  readCodexCleanerObservability,
+  type CodexCleanerObservability,
+} from "./context-cleaner/observability.js";
 import { readDaemonStatus } from "./daemon.js";
 import { resolveCodexHookCommandForInstall, resolveCodexMcpServerSpecForInstall } from "./install.js";
+import { resolveLatestCodexSessionId } from "./session-state.js";
 
 export type CodexDoctorReport = {
   configPath: string;
@@ -67,6 +73,7 @@ export type CodexDoctorReport = {
   rebaseCapabilityTrusted?: boolean;
   rebaseCapabilityIssue?: string;
   taskStateEstimator?: CodexEstimatorDiagnostic;
+  cleaner?: CodexCleanerObservability;
 };
 
 export type CodexProviderDiagnostic = {
@@ -157,6 +164,7 @@ async function checkHealth(baseUrl: string): Promise<boolean> {
 }
 
 export function formatCodexDoctorReport(report: CodexDoctorReport): string {
+  const cleaner = report.cleaner ?? emptyCodexCleanerObservability();
   const taskStateEstimator = report.taskStateEstimator ?? {
     status: "disabled" as const,
     model: null,
@@ -215,6 +223,11 @@ export function formatCodexDoctorReport(report: CodexDoctorReport): string {
     `- task-state estimator eviction lookahead turns: ${taskStateEstimator.evictionLookaheadTurns}`,
     `- task-state estimator missing fields: ${taskStateEstimator.missingFields.length > 0 ? taskStateEstimator.missingFields.join(", ") : "(none)"}`,
     `- CDR-05 rebase capability cache: ${rebaseCapabilitySummary}`,
+    `- Cleaner capability: ${cleaner.availability}`,
+    `- Cleaner plan store: ${cleaner.planStore}`,
+    `- Cleaner pending plan: ${cleaner.pendingPlan}`,
+    `- Cleaner last receipt: ${cleaner.lastReceipt}`,
+    `- Cleaner rewrite mode: ${cleaner.rewriteMode}`,
   ];
   const fixes: string[] = [];
   if (!report.adapterEnabled) {
@@ -332,6 +345,10 @@ export async function inspectCodexDoctor(params: {
     config: params.config.taskStateEstimator,
     env: process.env,
   }));
+  const latestSessionId = await resolveLatestCodexSessionId(params.config.stateDir);
+  const cleaner = latestSessionId
+    ? await readCodexCleanerObservability({ stateDir: params.config.stateDir, sessionId: latestSessionId })
+    : emptyCodexCleanerObservability();
   return {
     configPath: params.configPath,
     hooksConfigPath: params.hooksConfigPath,
@@ -368,5 +385,6 @@ export async function inspectCodexDoctor(params: {
     rebaseCapabilityTrusted,
     rebaseCapabilityIssue,
     taskStateEstimator,
+    cleaner,
   };
 }
