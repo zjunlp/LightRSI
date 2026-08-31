@@ -78,10 +78,11 @@ The installer will:
 - repoint that active provider's `base_url` to the local TokenPilot proxy
 - persist the original upstream provider config into `~/.codex/tokenpilot.json`
 - register a `tokenpilot_memory_fault_recover` MCP server in Codex config
-- write a conservative `startup_timeout_sec` for the recovery MCP server
-- write TokenPilot runtime config
-- register TokenPilot hooks for `SessionStart`, `PreToolUse`, `PostToolUse`, and `Stop`
-- install read-only Codex skill bridge entries under the local Codex skills directory
+ - write a conservative `startup_timeout_sec` for the recovery MCP server
+ - write TokenPilot runtime config
+ - start the local TokenPilot proxy immediately
+ - register TokenPilot hooks for `SessionStart`, `PreToolUse`, and `PostToolUse`
+ - install read-only Codex skill bridge entries under the local Codex skills directory
 - run a post-install MCP startup probe and report degraded mode if recovery MCP is still unavailable
 
 The installed Codex skill bridge currently creates these explicit skills:
@@ -305,7 +306,7 @@ Expected install shape:
 
 If Codex reports that hooks need review, trust the TokenPilot hooks in Codex, open a new session, and rerun the doctor.
 
-If Codex displays `Stop hook (failed)` or `PostToolUse hook (failed)` after a repository reorganization, rebuild and reinstall the adapter so `~/.codex/hooks.json` points at the current handler:
+If Codex displays `PostToolUse hook (failed)` after a repository reorganization, rebuild and reinstall the adapter so `~/.codex/hooks.json` points at the current handler. Reinstall also removes legacy TokenPilot `Stop` hooks:
 
 ```bash
 npm --prefix components/adapters/codex run build
