@@ -55,6 +55,7 @@ function taskEvidence(registry: SessionTaskRegistry): Record<string, ContextClea
 function analyzedReceipt(
   plan: ContextCleanPlan,
   reasons: string[],
+  fallbackUsed: boolean,
 ): ContextCleanPendingReceipt {
   return {
     schemaVersion: CONTEXT_CLEAN_SCHEMA_VERSION,
@@ -69,7 +70,7 @@ function analyzedReceipt(
     deferredTaskIds: [],
     reasons,
     updatedAt: plan.createdAt,
-    fallbackUsed: false,
+    fallbackUsed,
   };
 }
 
@@ -136,7 +137,7 @@ export async function analyzeContextCleanSession(
   const saved = await saveContextCleanPlan({ stateDir: params.stateDir, plan });
   if (saved.bypassed) throwStoreFailure("clean_analysis_plan_store_failed", saved.reasons);
 
-  const receipt = analyzedReceipt(plan, recommended.reasons);
+  const receipt = analyzedReceipt(plan, recommended.reasons, recommended.fallbackUsed);
   const transitioned = await transitionContextCleanState({ stateDir: params.stateDir, receipt });
   if (transitioned.bypassed) {
     throwStoreFailure("clean_analysis_receipt_store_failed", transitioned.reasons);
@@ -208,6 +209,7 @@ function pendingReceipt(params: {
   status: "approved" | "scheduled";
   selectedTaskIds: string[];
   updatedAt: string;
+  fallbackUsed: boolean;
 }): ContextCleanPendingReceipt {
   const estimated = savings(params.plan.tasks.filter((task) => params.selectedTaskIds.includes(task.taskId)));
   return {
@@ -223,7 +225,7 @@ function pendingReceipt(params: {
     deferredTaskIds: [],
     reasons: [],
     updatedAt: params.updatedAt,
-    fallbackUsed: false,
+    fallbackUsed: params.fallbackUsed,
   };
 }
 
@@ -264,6 +266,7 @@ export function createContextCleanerControlPlane(params: {
           status: "approved",
           selectedTaskIds,
           updatedAt: request.approvedAt,
+          fallbackUsed: currentReceipt.value?.fallbackUsed ?? false,
         });
         const result = await transitionContextCleanState({ stateDir: params.stateDir, receipt: approved });
         if (result.bypassed) throwStoreFailure("clean_approval_store_failed", result.reasons);
@@ -278,6 +281,7 @@ export function createContextCleanerControlPlane(params: {
         status: "scheduled",
         selectedTaskIds,
         updatedAt: now(),
+        fallbackUsed: currentReceipt.value?.fallbackUsed ?? false,
       });
       const result = await transitionContextCleanState({ stateDir: params.stateDir, receipt: scheduled });
       if (result.bypassed) throwStoreFailure("clean_schedule_store_failed", result.reasons);
@@ -312,7 +316,7 @@ export function createContextCleanerControlPlane(params: {
         deferredTaskIds: current?.deferredTaskIds ?? [],
         reasons: ["cancelled_by_user"],
         updatedAt: now(),
-        fallbackUsed: false,
+        fallbackUsed: current?.fallbackUsed ?? false,
       };
       const result = await transitionContextCleanState({ stateDir: params.stateDir, receipt: cancelled });
       if (result.bypassed) throwStoreFailure("clean_cancel_store_failed", result.reasons);

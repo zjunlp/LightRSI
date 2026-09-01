@@ -148,6 +148,7 @@ test("reports actual Claude savings only after the shared receipt is applied", a
       receipt: {
         ...scheduledReceipt(),
         status: "applied",
+        fallbackUsed: false,
         appliedSavedTokens: null,
         appliedSavedChars: 59,
         evidence: {

@@ -42,6 +42,7 @@
     "build": "tsx build.ts",
     "test": "pnpm run build && node --import tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "compatibility:smoke": "node scripts/compatibility-smoke.mjs",
     "prepack": "pnpm run build"
   },
   "devDependencies": {

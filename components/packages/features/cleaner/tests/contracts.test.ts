@@ -143,6 +143,7 @@ test("only applied receipts expose actual savings", () => {
     status: "applied",
     appliedSavedTokens: 40,
     appliedSavedChars: 160,
+    fallbackUsed: false,
     evidence: {
       previousRevision: "rev-1",
       nextRevision: "rev-2",

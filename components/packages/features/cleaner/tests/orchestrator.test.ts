@@ -187,6 +187,30 @@ test("missing recommendation provider fails closed without making tasks unsafe",
     assert.equal(result.fallbackUsed, true);
     assert.deepEqual(result.reasons, ["recommendation_provider_unavailable"]);
     assert.deepEqual(result.plan.tasks.map((task) => task.recommendation), ["keep", "protected"]);
+    const persistedReceipt = await readContextCleanReceipt({ stateDir: root, planId: result.plan.planId });
+    assert.equal(persistedReceipt.value?.status, "analyzed");
+    assert.equal(persistedReceipt.value?.fallbackUsed, true);
+
+    const selected = result.plan.tasks.find((task) => task.taskId === "task-a")!;
+    const controlPlane = createContextCleanerControlPlane({
+      stateDir: root,
+      now: () => "2026-08-20T00:02:00.000Z",
+    });
+    const scheduled = await controlPlane.executeApprovedClean({
+      schemaVersion: CONTEXT_CLEAN_SCHEMA_VERSION,
+      cleanPlanId: result.plan.planId,
+      hostId: result.plan.hostId,
+      sessionId: result.plan.sessionId,
+      baseRevision: result.plan.baseRevision,
+      approvedAt: "2026-08-20T00:01:00.000Z",
+      selectedTasks: [{
+        taskId: selected.taskId,
+        itemIds: selected.itemIds,
+        itemDigests: selected.itemDigests,
+      }],
+    });
+    assert.equal(scheduled.status, "scheduled");
+    assert.equal(scheduled.fallbackUsed, true);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

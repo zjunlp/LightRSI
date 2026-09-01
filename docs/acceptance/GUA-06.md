@@ -52,6 +52,18 @@ Codex status: **PASS** for non-streaming estimator-driven mock-upstream acceptan
 
 Unlike a full-history gateway request, a Codex native continuation carries old history implicitly through `previous_response_id`. Consequently the shared oracle is used here for sentinel, closure, and fallback safety on the two planner-triggering requests; raw request-byte savings are not claimed by this test.
 
+## DeepSeek Harness Compatibility
+
+Command:
+
+```text
+pnpm --filter @lightrsi/deepseek-harness-adapter compatibility:smoke -- --dsh-checkout=/absolute/path/to/deepseek-harness
+```
+
+The compatibility smoke pins the tested DSH release to version `0.1.2-alpha.3` at commit `dd6322d604e00eec1ba5e0c8541159906a21094a` and checks the declared Node range before running. It builds and packs the adapter, runs the adapter projection/restart tests, builds DSH, runs DSH's keyless headless smoke, verifies idempotent plugin installation in both web and headless profiles, starts the Web host on an isolated loopback port, and verifies plugin removal.
+
+The child processes receive only a small non-secret environment allowlist. HOME, XDG directories, DSH_HOME, and Windows application-data directories are redirected to a temporary root; real user configuration and credentials are not read. An unknown checkout requires `--allow-unknown` and is observation-only: the script reports `mutationEnabled: false` and does not claim compatibility with the pinned release.
+
 ## Three-host Fixture Oracle
 
 The existing GUA-02 suite runs the same four logical fixtures through the OpenClaw reference backend, Claude overlay backend, and Codex response-chain backend:

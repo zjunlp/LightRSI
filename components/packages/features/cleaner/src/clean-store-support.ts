@@ -216,7 +216,6 @@ export function parseContextCleanReceipt(value: unknown): ContextCleanReceipt | 
     if (!hasAppliedTokens || !hasAppliedChars || !nullableCount(value.appliedSavedTokens)
       || !finiteNonNegative(value.appliedSavedChars) || value.fallbackUsed) return undefined;
   } else if (hasAppliedTokens || hasAppliedChars) return undefined;
-  if (["analyzed", "approved", "scheduled"].includes(status) && value.fallbackUsed) return undefined;
   const evidence = parseEvidence(value.evidence, applied);
   if (value.evidence !== undefined && evidence === undefined) return undefined;
   if (applied && evidence === undefined) return undefined;

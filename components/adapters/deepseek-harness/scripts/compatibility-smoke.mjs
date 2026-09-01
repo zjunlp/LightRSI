@@ -192,6 +192,41 @@ function latestTarball(directory) {
   return join(directory, candidates[0]);
 }
 
+const SAFE_ENVIRONMENT_KEYS = [
+  "PATH",
+  "Path",
+  "PATHEXT",
+  "SystemRoot",
+  "ComSpec",
+  "TMP",
+  "TEMP",
+  "TMPDIR",
+  "LANG",
+  "LC_ALL",
+  "TZ",
+  "CI",
+  "TERM",
+  "NO_COLOR",
+];
+
+function isolatedSmokeEnvironment(paths) {
+  const environment = {};
+  for (const key of SAFE_ENVIRONMENT_KEYS) {
+    if (process.env[key] !== undefined) environment[key] = process.env[key];
+  }
+
+  environment.HOME = paths.userHome;
+  environment.USERPROFILE = paths.userHome;
+  environment.DSH_HOME = paths.dshHome;
+  environment.XDG_CONFIG_HOME = join(paths.root, "xdg-config");
+  environment.XDG_DATA_HOME = join(paths.root, "xdg-data");
+  environment.XDG_CACHE_HOME = join(paths.root, "xdg-cache");
+  environment.APPDATA = join(paths.root, "appdata");
+  environment.LOCALAPPDATA = join(paths.root, "localappdata");
+  environment.DSH_TELEMETRY_DISABLED = "1";
+  return environment;
+}
+
 async function main() {
   const checkoutOption = option("dsh-checkout") ?? process.env.DSH_CHECKOUT;
 
@@ -243,22 +278,11 @@ async function main() {
   mkdirSync(temporaryUserHome, { recursive: true });
   mkdirSync(artifacts, { recursive: true });
 
-  const smokeEnvironment = {
-    ...process.env,
-    HOME: temporaryUserHome,
-    USERPROFILE: temporaryUserHome,
-    DSH_HOME: dshHome,
-    DSH_TELEMETRY_DISABLED: "1",
-  };
-
-  for (const secret of [
-    "ANTHROPIC_API_KEY",
-    "DEEPSEEK_API_KEY",
-    "GOOGLE_API_KEY",
-    "OPENAI_API_KEY",
-  ]) {
-    delete smokeEnvironment[secret];
-  }
+  const smokeEnvironment = isolatedSmokeEnvironment({
+    root: temporaryRoot,
+    userHome: temporaryUserHome,
+    dshHome,
+  });
 
   try {
     const typecheck = corepackPnpm([

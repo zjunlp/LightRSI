@@ -133,7 +133,8 @@ export type ContextCleanPendingReceipt = ContextCleanReceiptBase & {
   appliedSavedTokens?: never;
   appliedSavedChars?: never;
   evidence?: ContextCleanEvidence;
-  fallbackUsed: false;
+  /** Whether recommendation fell back to the deterministic safe policy. */
+  fallbackUsed: boolean;
 };
 
 export type ContextCleanScheduledReceipt = Omit<

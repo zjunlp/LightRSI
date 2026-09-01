@@ -59,6 +59,7 @@ function appliedReceipt(): ContextCleanAppliedReceipt {
   return {
     ...pendingReceipt("scheduled"),
     status: "applied",
+    fallbackUsed: false,
     appliedSavedTokens: null,
     appliedSavedChars: 10,
     evidence: {
