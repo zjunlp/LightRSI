@@ -40,7 +40,7 @@ pnpm lightrsi:test
 
 When reporting a bug, include:
 
-- **Host**: `OpenClaw`, `Codex`, or `Claude Code`
+- **Host**: `OpenClaw`, `Codex`, `Claude Code`, or `DeepSeek Harness`
 - **Install path**: Default or custom config path
 - **Exact commands**: What you ran
 - **Config**: Relevant config snippets (with sensitive values redacted)

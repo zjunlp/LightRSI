@@ -5,8 +5,8 @@ Codex CLI integration uses a **local proxy + hooks** pattern. TokenPilot runs as
 ## Installation
 
 ```bash
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/codex run install:codex
 ```
 
 This command:
@@ -23,8 +23,8 @@ This command:
 export CODEX_CONFIG_PATH="/path/to/config.toml"
 export CODEX_HOOKS_CONFIG_PATH="/path/to/hooks.json"
 export TOKENPILOT_CODEX_CONFIG="/path/to/tokenpilot.json"
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/codex run install:codex
 ```
 
 ## Expected Output

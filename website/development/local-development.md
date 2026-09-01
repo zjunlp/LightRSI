@@ -42,23 +42,23 @@ pnpm lightrsi:test
 
 ```bash
 # Build a specific adapter
-npm --prefix components/tokenpilot/adapters/openclaw run build
+npm --prefix components/adapters/openclaw run build
 
 # Typecheck a specific package
-npm --prefix components/tokenpilot/packages/runtime-core run typecheck
+npm --prefix components/packages/foundation/runtime-core run typecheck
 ```
 
 ## Documentation Site
 
 ```bash
 # Start dev server
-pnpm docs:dev
+pnpm --dir website docs:dev
 
 # Build for production
-pnpm docs:build
+pnpm --dir website docs:build
 
 # Preview production build
-pnpm docs:preview
+pnpm --dir website docs:preview
 ```
 
 ## Next

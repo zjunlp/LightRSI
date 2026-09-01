@@ -19,7 +19,7 @@ A plugin is a self-contained package with:
 | :-- | :-- | :-- |
 | [TokenPilot](/plugin-catalog/tokenpilot/overview) | Cache-aware context management | Stable |
 
-TokenPilot currently supports OpenClaw, Codex, and Claude Code.
+TokenPilot currently provides full host integrations for OpenClaw, Codex, and Claude Code. A narrower DeepSeek Harness compatibility adapter is maintained separately.
 
 ## Next
 

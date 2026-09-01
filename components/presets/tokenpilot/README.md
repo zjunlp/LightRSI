@@ -68,7 +68,7 @@ Adapter development notes live in:
 
 - [adapters/README.md](../../adapters/README.md)
 
-This is the intended reuse boundary for future hosts such as Codex CLI or Claude Code.
+This is the intended reuse boundary for additional host adapters and future presets.
 
 ## Component Layout
 
@@ -79,7 +79,7 @@ components/
 │   └── features/         # Stabilizer, Reduction, Eviction, and Memory
 ├── presets/
 │   └── tokenpilot/       # This preset: Stabilizer + Reduction + Eviction
-├── adapters/             # OpenClaw, Codex, and Claude Code bindings
+├── adapters/             # OpenClaw, Codex, Claude Code, and compatibility bindings
 └── products/             # Shared CLI and MCP surfaces
 ```
 

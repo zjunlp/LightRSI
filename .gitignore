@@ -1,13 +1,9 @@
-# TokenPilot (Node/TS monorepo)
+# LightRSI (Node/TS monorepo)
 node_modules/
 dist/
 coverage/
 .pnpm-store/
 *.tsbuildinfo
-components/tokenpilot/packages/openclaw-plugin/.tmp/
-components/tokenpilot/packages/openclaw-plugin/*.tgz
-components/tokenpilot/adapters/openclaw/.tmp/
-components/tokenpilot/adapters/openclaw/*.tgz
 components/adapters/openclaw/*.tgz
 components/adapters/codex/*.tgz
 components/adapters/claude-code/*.tgz

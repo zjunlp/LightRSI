@@ -1,16 +1,19 @@
 # Host Compatibility
 
-LightRSI supports three agent hosts. Each host has a different integration style, but the plugin behavior is consistent across all of them.
+LightRSI provides three full TokenPilot host surfaces and a separate DeepSeek Harness compatibility adapter. Each integration has a different boundary, so the shared runtime behavior and host-specific capabilities are documented separately.
 
 ## Supported Hosts
 
 | Host | Integration | Adapter Location |
 | :-- | :-- | :-- |
-| [OpenClaw](./openclaw) | Native plugin slot | `components/tokenpilot/adapters/openclaw/` |
-| [Codex CLI](./codex) | Local proxy + hooks | `components/tokenpilot/adapters/codex/` |
-| [Claude Code](./claude-code) | Local gateway + MCP | `components/tokenpilot/adapters/claude-code/` |
+| [OpenClaw](./openclaw) | Native plugin slot | `components/adapters/openclaw/` |
+| [Codex CLI](./codex) | Local proxy + hooks | `components/adapters/codex/` |
+| [Claude Code](./claude-code) | Local gateway + MCP | `components/adapters/claude-code/` |
+| DeepSeek Harness | Cordis plugin + durable projection | `components/adapters/deepseek-harness/` |
 
-## Feature Matrix
+DeepSeek Harness currently exposes the adapter projection and compatibility smoke path. Its canonical-surface eviction remains opt-in and is not included in the feature matrix below, which describes the TokenPilot interactive host surfaces.
+
+## TokenPilot Host Feature Matrix
 
 | Feature | OpenClaw | Codex | Claude Code |
 | :-- | :-- | :-- | :-- |

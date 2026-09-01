@@ -2,7 +2,7 @@
 
 No formal manifest specification exists. TokenPilot uses JSON configuration per host rather than a manifest file. Its identity is expressed through:
 
-- Repository path: `components/tokenpilot/`
+- Repository path: `components/presets/tokenpilot/`
 - Namespace: `tokenpilot` (for plugin id and persisted state)
 - CLI namespace: `lightrsi`
 

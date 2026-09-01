@@ -7,7 +7,7 @@ From the [components/README.md](https://github.com/zjunlp/LightRSI/blob/main/com
 - **Component packages**: reusable runtime logic, state and policy layers, host-agnostic contracts
 - **Host adapters**: installation and bootstrap, transcript/session bridging, host-specific command and hook surfaces
 
-From the [adapters/README.md](https://github.com/zjunlp/LightRSI/blob/main/components/tokenpilot/adapters/README.md):
+From the [adapters/README.md](https://github.com/zjunlp/LightRSI/blob/main/components/adapters/README.md):
 
 **Adapter responsibilities** (keep inside adapter layer):
 - Host install and uninstall flow
@@ -19,18 +19,18 @@ From the [adapters/README.md](https://github.com/zjunlp/LightRSI/blob/main/compo
 - Host-owned path resolution
 
 **Shared package responsibilities** (keep in shared packages):
-- Runtime contracts in `packages/kernel/`
-- Host-neutral execution primitives in `packages/runtime-core/`
-- State and policy logic in `packages/layers/*`
-- Host abstraction helpers in `packages/host-adapter/`
-- Shared command semantics in `packages/product-surface/`
+- Runtime contracts in `components/packages/foundation/kernel/`
+- Host-neutral execution primitives in `components/packages/foundation/runtime-core/`
+- State and policy logic in `components/packages/{foundation,features}/**`
+- Host abstraction helpers in `components/packages/foundation/host-adapter/`
+- Shared command semantics in `components/packages/foundation/product-surface/`
 - Standalone product entrypoints in `products/`
 
-From the [HOSTS.md boundary section](https://github.com/zjunlp/LightRSI/blob/main/components/tokenpilot/HOSTS.md):
+From the [HOSTS.md boundary section](https://github.com/zjunlp/LightRSI/blob/main/components/adapters/HOSTS.md):
 
-- `components/tokenpilot/packages/*` — reusable component logic
-- `components/tokenpilot/products/*` — shared product surfaces
-- `components/tokenpilot/adapters/<host>` — host-specific integration layer
+- `components/packages/*` — reusable component logic
+- `components/products/*` — shared product surfaces
+- `components/adapters/<host>` — host-specific integration layer
 
 ## Related Pages
 

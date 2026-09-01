@@ -7,7 +7,7 @@ From source:
 | Host | Config Location | Purpose |
 | :-- | :-- | :-- |
 | **OpenClaw** | Plugin entry in `~/.openclaw/openclaw.json` | TokenPilot registered as a plugin within OpenClaw configuration |
-| **Codex CLI** | `~/.codex/tokenpilot.json` (runtime config) + `~/.codex/hooks.json` (hook registration) | `tokenpilot.json` stores provider config and runtime settings. `hooks.json` registers hooks (`SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`). Host's `config.toml` modified to reroute provider `base_url` to local proxy |
+| **Codex CLI** | `~/.codex/tokenpilot.json` (runtime config) + `~/.codex/hooks.json` (hook registration) | `tokenpilot.json` stores provider config and runtime settings. `hooks.json` registers hooks (`SessionStart`, `PreToolUse`, `PostToolUse`). Host's `config.toml` modified to reroute provider `base_url` to local proxy |
 | **Claude Code** | `~/.claude/tokenpilot.json` (runtime config) + `~/.claude/settings.json` (gateway routing) + `~/.claude/.claude.json` (MCP registration) | `tokenpilot.json` stores runtime config. `settings.json` updated for gateway routing. `.claude.json` registers `tokenpilot_memory_fault_recover` MCP server |
 
 ## Environment Variables
@@ -34,4 +34,4 @@ Before modifying existing host config files, the installer creates `.tokenpilot.
 - [Adapter Architecture](./adapter-architecture.md)
 - [Adding a New Host](./adding-new-host.md)
 - [Hook and Proxy Integration](./hook-proxy-integration.md)
-- [TokenPilot Configuration](https://github.com/zjunlp/LightRSI/blob/main/components/tokenpilot/README.md)
+- [TokenPilot Configuration](https://github.com/zjunlp/LightRSI/blob/main/README.md)

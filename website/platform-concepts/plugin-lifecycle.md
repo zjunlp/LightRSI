@@ -3,7 +3,7 @@
 No formal plugin lifecycle specification exists. TokenPilot uses host-specific mechanisms:
 
 - **OpenClaw**: native plugin slot with bundled runtime
-- **Codex CLI**: hooks (`SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`) via `hooks.json`
+- **Codex CLI**: hooks (`SessionStart`, `PreToolUse`, `PostToolUse`) via `hooks.json`
 - **Claude Code**: `SessionStart` hook + gateway + MCP recovery
 
 ## Next

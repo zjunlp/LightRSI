@@ -1,29 +1,37 @@
 # Repository Structure
 
-The LightRSI repository is organized around the plugin platform and its components.
+The LightRSI repository is organized around a reusable runtime platform, feature packages, presets, products, and host adapters.
 
 ```text
 LightRSI/
 ├── components/
-│   └── tokenpilot/              # TokenPilot plugin
-│       ├── adapters/            # Host-specific integration
-│       │   ├── openclaw/        #   OpenClaw native plugin adapter
-│       │   ├── codex/           #   Codex CLI proxy + hooks adapter
-│       │   └── claude-code/     #   Claude Code gateway + MCP adapter
-│       ├── products/
-│       │   ├── cli/             #   Shared lightrsi CLI
-│       │   └── mcp/             #   Shared MCP recovery server
-│       └── packages/
-│           ├── host-adapter/    #   Shared adapter contracts
-│           ├── runtime-core/    #   Host-agnostic runtime engine
-│           ├── kernel/          #   Shared types, interfaces, events
-│           └── layers/
-│               ├── history/     #   Canonical state, turns, task registry
-│               ├── decision/    #   Policy analysis, reduction/eviction
-│               └── memory/      #   Experimental memory layer
-├── docs/                        # Public-facing notes and helpers
-├── website/                     # This documentation site
-├── figs/                        # Images for README
+│   ├── adapters/                # Host-specific integration
+│   │   ├── openclaw/            #   OpenClaw native plugin adapter
+│   │   ├── codex/               #   Codex CLI proxy + hooks adapter
+│   │   ├── claude-code/         #   Claude Code gateway + MCP adapter
+│   │   └── deepseek-harness/    #   DeepSeek Harness Cordis adapter
+│   ├── products/                # Shared user-facing entrypoints
+│   │   ├── cli/                 #   Shared lightrsi CLI
+│   │   └── mcp/                 #   Shared MCP recovery server
+│   ├── presets/
+│   │   └── tokenpilot/          # TokenPilot feature composition
+│   └── packages/
+│       ├── foundation/          # Contracts and host-neutral primitives
+│       │   ├── kernel/
+│       │   ├── runtime-core/
+│       │   ├── host-adapter/
+│       │   ├── history/
+│       │   ├── artifact-store/
+│       │   └── product-surface/
+│       └── features/            # Reusable policy and feature modules
+│           ├── stabilizer/
+│           ├── reduction/
+│           ├── eviction/
+│           ├── cleaner/
+│           └── memory/
+├── docs/                        # Public acceptance and adapter notes
+├── website/                     # Documentation site
+├── figs/                        # README images
 └── README.md
 ```
 
@@ -33,12 +41,12 @@ Benchmark tasks, runners, profiles, and analysis are maintained in the separate 
 
 | Directory | Purpose |
 | :-- | :-- |
-| `components/tokenpilot/packages/kernel/` | Types, interfaces, events — the contract layer |
-| `components/tokenpilot/packages/runtime-core/` | Plugin execution engine |
-| `components/tokenpilot/packages/layers/` | Stateful processing (history, decision, memory) |
-| `components/tokenpilot/adapters/` | One adapter per host |
-| `components/tokenpilot/products/cli/` | The `lightrsi` CLI |
-| `components/tokenpilot/products/mcp/` | Shared MCP server |
+| `components/packages/foundation/` | Contracts, history, runtime, and host-neutral primitives |
+| `components/packages/features/` | Stabilization, reduction, eviction, cleaner, and memory policies |
+| `components/presets/tokenpilot/` | TokenPilot feature composition and presentation identity |
+| `components/adapters/` | Host-specific installation, bridging, and runtime integration |
+| `components/products/cli/` | The `lightrsi` CLI |
+| `components/products/mcp/` | Shared MCP recovery server |
 
 ## Workspace
 

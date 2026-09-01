@@ -13,9 +13,9 @@ pnpm lightrsi:build
 pnpm lightrsi:install
 
 # Build specific adapter
-npm --prefix components/tokenpilot/adapters/openclaw run build
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/claude-code run build
+npm --prefix components/adapters/openclaw run build
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/claude-code run build
 ```
 
 ## Typecheck
@@ -25,7 +25,7 @@ npm --prefix components/tokenpilot/adapters/claude-code run build
 pnpm typecheck
 
 # Typecheck specific package
-npm --prefix components/tokenpilot/packages/runtime-core run typecheck
+npm --prefix components/packages/foundation/runtime-core run typecheck
 ```
 
 ## Test
@@ -35,7 +35,7 @@ npm --prefix components/tokenpilot/packages/runtime-core run typecheck
 pnpm lightrsi:test
 
 # Run tests for specific package
-npm --prefix components/tokenpilot/products/cli test
+npm --prefix components/products/cli test
 ```
 
 ## CI
@@ -48,9 +48,9 @@ GitHub Actions workflows are in `.github/workflows/`. The CI runs:
 ## Documentation
 
 ```bash
-pnpm docs:dev      # Dev server with hot reload
-pnpm docs:build    # Production build
-pnpm docs:preview  # Preview production build
+pnpm --dir website docs:dev      # Dev server with hot reload
+pnpm --dir website docs:build    # Production build
+pnpm --dir website docs:preview  # Preview production build
 ```
 
 ## Next

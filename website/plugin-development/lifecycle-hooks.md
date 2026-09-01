@@ -4,12 +4,12 @@ TokenPilot implements host-specific lifecycle hooks through its adapters. The ac
 
 | Host | Hooks Used |
 | :-- | :-- |
-| Codex CLI | `SessionStart`, `PreToolUse`, `PostToolUse`, `Stop` (registered in `hooks.json`) |
+| Codex CLI | `SessionStart`, `PreToolUse`, `PostToolUse` (registered in `hooks.json`) |
 | Claude Code | `SessionStart` (auto-starts gateway) |
 
 These are host-specific hook names used by TokenPilot adapters, not a universal lifecycle specification. No formal lifecycle hook specification exists for the platform.
 
-The shared runtime logic lives in `packages/runtime-core/`, while the hook wiring lives in `adapters/<host>/src/integration/`.
+The shared runtime logic lives in `components/packages/foundation/runtime-core/`, while the hook wiring lives in `components/adapters/<host>/src/`.
 
 ## Related Pages
 

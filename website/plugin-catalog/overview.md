@@ -8,10 +8,11 @@ LightRSI plugins provide reusable agent capabilities. Each plugin is independent
 | :-- | :-- | :-- | :-- |
 | [TokenPilot](./tokenpilot/overview) | Cache-aware context management | <span class="badge-stable">Stable</span> | OpenClaw, Codex, Claude Code |
 
+DeepSeek Harness is currently exposed as a compatibility adapter rather than a full TokenPilot plugin surface.
+
 ## Plugin Statuses
 
 | Status | Meaning |
 | :-- | :-- |
 | <span class="badge-stable">Stable</span> | Installed by users, API is frozen, covered by benchmarks |
 | <span class="badge-experimental">Experimental</span> | Under active development, API may change, not recommended for production |
-

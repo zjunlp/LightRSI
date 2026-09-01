@@ -30,8 +30,8 @@ pnpm component:install:tokenpilot:openclaw
 ### Codex
 
 ```bash
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/codex run install:codex
 ```
 
 This command:
@@ -46,15 +46,15 @@ This command:
 export CODEX_CONFIG_PATH="/path/to/config.toml"
 export CODEX_HOOKS_CONFIG_PATH="/path/to/hooks.json"
 export TOKENPILOT_CODEX_CONFIG="/path/to/tokenpilot.json"
-npm --prefix components/tokenpilot/adapters/codex run build
-npm --prefix components/tokenpilot/adapters/codex run install:codex
+npm --prefix components/adapters/codex run build
+npm --prefix components/adapters/codex run install:codex
 ```
 
 ### Claude Code
 
 ```bash
-npm --prefix components/tokenpilot/adapters/claude-code run build
-npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
+npm --prefix components/adapters/claude-code run build
+npm --prefix components/adapters/claude-code run install:claude-code
 ```
 
 This command:
@@ -70,8 +70,8 @@ This command:
 export CLAUDE_CODE_SETTINGS_PATH="/path/to/settings.json"
 export CLAUDE_CODE_MCP_CONFIG_PATH="/path/to/.claude.json"
 export TOKENPILOT_CLAUDE_CODE_CONFIG="/path/to/tokenpilot.json"
-npm --prefix components/tokenpilot/adapters/claude-code run build
-npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code
+npm --prefix components/adapters/claude-code run build
+npm --prefix components/adapters/claude-code run install:claude-code
 ```
 
 ## Verify Installation

@@ -9,7 +9,7 @@ This page covers the LightRSI platform installation — the shared runtime that 
 | **Node.js** | ≥ 18 | v20+ recommended |
 | **pnpm** | ≥ 9 | v10.32+ used in development |
 | **OS** | macOS, Linux, Windows (WSL) | Windows native may work but is less tested |
-| **Target Host** | OpenClaw / Codex / Claude Code | At least one must be installed |
+| **Target Host** | OpenClaw / Codex / Claude Code for full TokenPilot support; DeepSeek Harness for compatibility smoke testing | At least one target integration must be available |
 
 No cloud services, API keys, or external dependencies are required.
 
@@ -35,7 +35,7 @@ This installs all workspace dependencies across the plugin packages and host ada
 pnpm build
 ```
 
-This builds the shared packages (`runtime-core`, `kernel`, `layers`, `host-adapter`) that all plugins and adapters depend on.
+This builds the shared foundation and feature packages that plugins and adapters depend on.
 
 ## Step 4: Build and Install the CLI
 
@@ -73,7 +73,7 @@ This shows your current default host, pinned session, and config target.
 | :-- | :-- | :-- |
 | `lightrsi` CLI | `~/.local/bin/lightrsi` | Standalone CLI for all hosts |
 | Shared packages | `node_modules/` (workspace) | Runtime engine, types, contracts |
-| Host adapter code | `components/tokenpilot/adapters/` | Per-host integration code |
+| Host adapter code | `components/adapters/` | Per-host integration code |
 
 ## Next
 

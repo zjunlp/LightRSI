@@ -18,9 +18,9 @@ hero:
 
 features:
   - title: Cache-Efficient Context
-    details: Stable-prefix rewriting delivers up to 95.7% fewer input tokens and 87.0% lower cost in long-running sessions.
+    details: Stable-prefix rewriting, context reduction, and lifecycle-aware eviction keep long-running sessions manageable.
   - title: Multi-Host Support
-    details: One plugin runs on OpenClaw, Codex CLI, and Claude Code through reusable host adapters.
+    details: TokenPilot runs on OpenClaw, Codex CLI, and Claude Code through reusable host adapters; LightRSI also exposes a DeepSeek Harness compatibility adapter.
   - title: Built-in Observability
     details: Session reports, visual inspector dashboard, and doctor diagnostics help you understand exactly what's happening.
   - title: Modular Plugin Architecture

@@ -18,12 +18,12 @@ The core runtime is implemented across these workspace packages:
 
 | Package | Purpose |
 | :-- | :-- |
-| `kernel` | Shared types, interfaces, events, and runtime contracts |
-| `runtime-core` | Host-agnostic runtime engine and shared execution logic |
-| `host-adapter` | Shared host-adapter contracts and path-resolution interfaces |
-| `layers/history` | Canonical state, raw semantic turns, task registry |
-| `layers/decision` | Policy analysis, reduction/eviction decisions, estimator |
-| `layers/memory` <span class="badge-experimental">experimental</span> | Distillation and retrieval (in progress) |
+| `components/packages/foundation/kernel` | Shared types, interfaces, events, and runtime contracts |
+| `components/packages/foundation/runtime-core` | Host-agnostic runtime engine and shared execution logic |
+| `components/packages/foundation/host-adapter` | Shared host-adapter contracts and path-resolution interfaces |
+| `components/packages/foundation/history` | Canonical state, raw semantic turns, task registry |
+| `components/packages/features/eviction` | Policy analysis, reduction/eviction decisions, estimator |
+| `components/packages/features/memory` <span class="badge-experimental">experimental</span> | Distillation and retrieval (in progress) |
 
 ## Next
 

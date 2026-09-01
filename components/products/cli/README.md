@@ -2,7 +2,7 @@
 
 This package builds the shared `lightrsi` command and browser Visual launcher. It is a product surface, not a host adapter and not an owner of TokenPilot algorithms.
 
-Host identity, state discovery, and preset ownership come from adapter-provided `ProductHostRegistration` records. The CLI adds host command runtime factories for OpenClaw, Codex, and Claude Code, then uses one registry for:
+Host identity, state discovery, and preset ownership come from adapter-provided `ProductHostRegistration` records. The CLI adds host command runtime factories for the full TokenPilot surfaces (OpenClaw, Codex, and Claude Code), then uses one registry for:
 
 - host parsing and usage text
 - command runtime selection

@@ -10,14 +10,15 @@ Build commands from [CONTRIBUTING.md](https://github.com/zjunlp/LightRSI/blob/ma
 | `pnpm build` | Build all shared packages in the workspace |
 | `pnpm lightrsi:build` | Build the standalone CLI surface |
 | `pnpm lightrsi:install` | Install the CLI entrypoint globally |
+| `pnpm --dir website docs:build` | Build the documentation site |
 
 Adapter install scripts:
 
 | Host | Install Command |
 | :-- | :-- |
 | OpenClaw | `pnpm component:install:tokenpilot:openclaw` |
-| Codex CLI | `npm --prefix components/tokenpilot/adapters/codex run install:codex` |
-| Claude Code | `npm --prefix components/tokenpilot/adapters/claude-code run install:claude-code` |
+| Codex CLI | `npm --prefix components/adapters/codex run install:codex` |
+| Claude Code | `npm --prefix components/adapters/claude-code run install:claude-code` |
 
 ## Related Pages
 

@@ -1,6 +1,6 @@
 # Host Adapters
 
-A host adapter is the **integration layer** between an agent host (OpenClaw, Codex, Claude Code) and the LightRSI core runtime. It translates host-specific events, APIs, and configuration into the standardized format that plugins expect.
+A host adapter is the **integration layer** between an agent host and the LightRSI core runtime. It translates host-specific events, APIs, and configuration into the standardized format that plugins expect. OpenClaw, Codex, and Claude Code provide the full TokenPilot surfaces; DeepSeek Harness currently provides a narrower compatibility adapter.
 
 ## Why Adapters Exist
 
@@ -44,9 +44,10 @@ The adapter abstracts these differences so plugins only deal with one consistent
 
 | Host | Adapter Location | Integration Style |
 | :-- | :-- | :-- |
-| OpenClaw | `components/tokenpilot/adapters/openclaw/` | Native plugin slot + restart |
-| Codex | `components/tokenpilot/adapters/codex/` | Local proxy + hooks |
-| Claude Code | `components/tokenpilot/adapters/claude-code/` | Local gateway + MCP |
+| OpenClaw | `components/adapters/openclaw/` | Native plugin slot + restart |
+| Codex | `components/adapters/codex/` | Local proxy + hooks |
+| Claude Code | `components/adapters/claude-code/` | Local gateway + MCP |
+| DeepSeek Harness | `components/adapters/deepseek-harness/` | Cordis plugin + durable projection |
 
 ## Next
 

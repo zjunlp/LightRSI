@@ -26,21 +26,13 @@ TokenPilot addresses this with three techniques:
 └─────────────────────────────────────────────────────┘
 ```
 
-## Key Results
+## Evaluation
 
-From the [TokenPilot paper](https://arxiv.org/abs/2606.17016), evaluated on PinchBench and Claw-Eval benchmarks (continuous mode):
-
-| Metric | PinchBench | Claw-Eval |
-| :-- | --: | --: |
-| Input token reduction | **67.4%** | **95.7%** |
-| Cost reduction | **61.5%** | **87.0%** |
-| Cache read (M tokens) | 8.55 vs. 25.02 (Vanilla) | 21.43 vs. 709.85 (Vanilla) |
-
-See [Benchmarks](/plugin-catalog/tokenpilot/benchmarks) for full results.
+TokenPilot is evaluated on PinchBench and Claw-Eval in isolated and continuous modes. Benchmark tasks, runners, configurations, and current results are maintained in the separate [TokenPilot experiment repository](https://github.com/Xubqpanda/TokenPilot); see [Benchmarks](/plugin-catalog/tokenpilot/benchmarks) for the reproduction entrypoint.
 
 ## Supported Hosts
 
-TokenPilot works on three agent hosts, each with a different integration style:
+TokenPilot has three full host integrations, each with a different integration style. LightRSI also contains a separate DeepSeek Harness compatibility adapter; it is not included in the full TokenPilot feature table below.
 
 | Host | Integration | Page |
 | :-- | :-- | :-- |

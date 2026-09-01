@@ -2,7 +2,7 @@
 
 This document is the implementation checklist for adding a new TokenPilot host adapter inside LightRSI.
 
-Use it before adding support for a new coding-agent host such as Codex CLI or Claude Code.
+Use it before adding support for a new coding-agent host such as Codex CLI, Claude Code, or DeepSeek Harness.
 
 ## Design First
 

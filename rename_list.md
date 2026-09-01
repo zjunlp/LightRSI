@@ -55,7 +55,7 @@
 
 - [√] Update README, CONTRIBUTING, component docs, adapter docs, and examples.
 - [√] Rename website page filenames and internal routes.
-- [ ] Update GitHub URLs after the repository is renamed.
+- [√] Update GitHub URLs after the repository is renamed.
 - [√] Replace old logo and overview assets with LightRSI assets.
 - [√] Keep paper-specific TokenPilot descriptions unchanged.
 - [√] Position LightRSI as a recursive-improvement runtime whose current implementation focuses on context and agentic memory.
@@ -74,7 +74,7 @@
 
 ## GitHub And Local Directory
 
-- [ ] Rename the GitHub repository from `LightMem2` to `LightRSI` after local verification.
-- [ ] Update `lab` and `origin` remote URLs after the GitHub rename.
+- [√] Rename the GitHub repository from `LightMem2` to `LightRSI` after local verification.
+- [√] Update `lab` and `origin` remote URLs after the GitHub rename.
 - [√] Rename the local directory from `LightMem2` to `LightRSI` last.
 - [√] Run one final dependency install, doctor inspection, and build from the renamed path.

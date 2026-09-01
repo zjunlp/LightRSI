@@ -58,13 +58,15 @@ components/
 │       ├── stabilizer/
 │       ├── reduction/
 │       ├── eviction/
+│       ├── cleaner/
 │       └── memory/
 ├── presets/
 │   └── tokenpilot/
 ├── adapters/
 │   ├── openclaw/
 │   ├── codex/
-│   └── claude-code/
+│   ├── claude-code/
+│   └── deepseek-harness/
 └── products/
     ├── cli/
     └── mcp/
@@ -87,10 +89,11 @@ Workspace npm packages use the `@lightrsi` scope:
 | Layer | Package identities |
 | :-- | :-- |
 | Foundation | `@lightrsi/kernel`, `@lightrsi/runtime-core`, `@lightrsi/host-adapter`, `@lightrsi/history`, `@lightrsi/artifact-store`, `@lightrsi/product-surface` |
-| Features | `@lightrsi/stabilizer`, `@lightrsi/reduction`, `@lightrsi/eviction`, `@lightrsi/memory` |
+| Features | `@lightrsi/stabilizer`, `@lightrsi/reduction`, `@lightrsi/eviction`, `@lightrsi/cleaner`, `@lightrsi/memory` |
 | Preset | `@lightrsi/tokenpilot` |
 | Products | `@lightrsi/cli`, `@lightrsi/mcp` |
 | Adapters | `@lightrsi/openclaw-adapter`, `@lightrsi/codex-adapter`, `@lightrsi/claude-code-adapter` |
+| Compatibility adapter | `@lightrsi/deepseek-harness-adapter` |
 
 These names define workspace ownership. They do not imply that every internal package is independently published; release entrypoints and their public export contracts are versioned separately.
 

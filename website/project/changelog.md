@@ -9,7 +9,7 @@
 - Stable prefix, context reduction, and context eviction subsystems
 - `lightrsi` standalone CLI
 - Visual inspector (browser-based dashboard)
-- PinchBench and Claw-Eval benchmark results
+- Benchmark reproduction moved to the separate [TokenPilot experiment repository](https://github.com/Xubqpanda/TokenPilot)
 - [TokenPilot paper](https://arxiv.org/abs/2606.17016) published
 
 ## Next
