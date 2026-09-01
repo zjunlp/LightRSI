@@ -1,0 +1,30 @@
+import{_ as a,o as s,c as n,a2 as t}from"./chunks/framework.BEmfQga0.js";const h=JSON.parse('{"title":"Repository Structure","description":"","frontmatter":{},"headers":[],"relativePath":"development/repository-structure.md","filePath":"development/repository-structure.md","lastUpdated":1788258471000}'),p={name:"development/repository-structure.md"};function r(i,e,l,o,c,d){return s(),n("div",null,[...e[0]||(e[0]=[t(`<h1 id="repository-structure" tabindex="-1">Repository Structure <a class="header-anchor" href="#repository-structure" aria-label="Permalink to &quot;Repository Structure&quot;">​</a></h1><p>The LightRSI repository is organized around a reusable runtime platform, feature packages, presets, products, and host adapters.</p><div class="language-text vp-adaptive-theme"><button title="Copy Code" class="copy"></button><span class="lang">text</span><pre class="shiki shiki-themes github-light github-dark vp-code" tabindex="0"><code><span class="line"><span>LightRSI/</span></span>
+<span class="line"><span>├── components/</span></span>
+<span class="line"><span>│   ├── adapters/                # Host-specific integration</span></span>
+<span class="line"><span>│   │   ├── openclaw/            #   OpenClaw native plugin adapter</span></span>
+<span class="line"><span>│   │   ├── codex/               #   Codex CLI proxy + hooks adapter</span></span>
+<span class="line"><span>│   │   ├── claude-code/         #   Claude Code gateway + MCP adapter</span></span>
+<span class="line"><span>│   │   └── deepseek-harness/    #   DeepSeek Harness Cordis adapter</span></span>
+<span class="line"><span>│   ├── products/                # Shared user-facing entrypoints</span></span>
+<span class="line"><span>│   │   ├── cli/                 #   Shared lightrsi CLI</span></span>
+<span class="line"><span>│   │   └── mcp/                 #   Shared MCP recovery server</span></span>
+<span class="line"><span>│   ├── presets/</span></span>
+<span class="line"><span>│   │   └── tokenpilot/          # TokenPilot feature composition</span></span>
+<span class="line"><span>│   └── packages/</span></span>
+<span class="line"><span>│       ├── foundation/          # Contracts and host-neutral primitives</span></span>
+<span class="line"><span>│       │   ├── kernel/</span></span>
+<span class="line"><span>│       │   ├── runtime-core/</span></span>
+<span class="line"><span>│       │   ├── host-adapter/</span></span>
+<span class="line"><span>│       │   ├── history/</span></span>
+<span class="line"><span>│       │   ├── artifact-store/</span></span>
+<span class="line"><span>│       │   └── product-surface/</span></span>
+<span class="line"><span>│       └── features/            # Reusable policy and feature modules</span></span>
+<span class="line"><span>│           ├── stabilizer/</span></span>
+<span class="line"><span>│           ├── reduction/</span></span>
+<span class="line"><span>│           ├── eviction/</span></span>
+<span class="line"><span>│           ├── cleaner/</span></span>
+<span class="line"><span>│           └── memory/</span></span>
+<span class="line"><span>├── docs/                        # Public acceptance and adapter notes</span></span>
+<span class="line"><span>├── website/                     # Documentation site</span></span>
+<span class="line"><span>├── figs/                        # README images</span></span>
+<span class="line"><span>└── README.md</span></span></code></pre></div><p>Benchmark tasks, runners, profiles, and analysis are maintained in the separate <a href="https://github.com/Xubqpanda/TokenPilot" target="_blank" rel="noreferrer">TokenPilot experiment repository</a>.</p><h2 id="key-directories" tabindex="-1">Key Directories <a class="header-anchor" href="#key-directories" aria-label="Permalink to &quot;Key Directories&quot;">​</a></h2><table tabindex="0"><thead><tr><th style="text-align:left;">Directory</th><th style="text-align:left;">Purpose</th></tr></thead><tbody><tr><td style="text-align:left;"><code>components/packages/foundation/</code></td><td style="text-align:left;">Contracts, history, runtime, and host-neutral primitives</td></tr><tr><td style="text-align:left;"><code>components/packages/features/</code></td><td style="text-align:left;">Stabilization, reduction, eviction, cleaner, and memory policies</td></tr><tr><td style="text-align:left;"><code>components/presets/tokenpilot/</code></td><td style="text-align:left;">TokenPilot feature composition and presentation identity</td></tr><tr><td style="text-align:left;"><code>components/adapters/</code></td><td style="text-align:left;">Host-specific installation, bridging, and runtime integration</td></tr><tr><td style="text-align:left;"><code>components/products/cli/</code></td><td style="text-align:left;">The <code>lightrsi</code> CLI</td></tr><tr><td style="text-align:left;"><code>components/products/mcp/</code></td><td style="text-align:left;">Shared MCP recovery server</td></tr></tbody></table><h2 id="workspace" tabindex="-1">Workspace <a class="header-anchor" href="#workspace" aria-label="Permalink to &quot;Workspace&quot;">​</a></h2><p>The repository uses pnpm workspaces. See <code>pnpm-workspace.yaml</code> for the full list.</p><h2 id="next" tabindex="-1">Next <a class="header-anchor" href="#next" aria-label="Permalink to &quot;Next&quot;">​</a></h2><ul><li><a href="/LightRSI/development/local-development">Local Development</a></li><li><a href="/LightRSI/development/build-and-test">Build and Test</a></li><li><a href="/LightRSI/development/contributing">Contributing</a></li></ul>`,10)])])}const m=a(p,[["render",r]]);export{h as __pageData,m as default};
