@@ -179,11 +179,12 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
     const hooks = JSON.parse(await readFile(hooksConfigPath, "utf8")) as {
       hooks?: Record<string, Array<{ hooks?: Array<{ command?: string }> }>>;
     };
-    for (const eventName of ["SessionStart", "PreToolUse", "PostToolUse", "Stop"]) {
+    for (const eventName of ["SessionStart", "PreToolUse", "PostToolUse"]) {
       const entries = hooks.hooks?.[eventName]?.[0]?.hooks;
       assert.ok(Array.isArray(entries), `${eventName} hook group missing`);
       assert.equal(String(entries[0]?.command ?? ""), result.expectedHookCommand);
     }
+    assert.equal(hooks.hooks?.Stop, undefined);
 
     const skillRaw = await readFile(join(result.commandSkillsDir, "lightrsi-report", "SKILL.md"), "utf8");
     assert.match(skillRaw, /lightrsi codex report/);
@@ -194,6 +195,49 @@ test("installCodexTokenPilot writes provider, MCP, and hooks with expected comma
   } finally {
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("installCodexTokenPilot removes legacy TokenPilot Stop hooks but preserves user hooks", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightmem2-codex-install-remove-stop-"));
+  try {
+    const codexConfigPath = join(dir, "config.toml");
+    const hooksConfigPath = join(dir, "hooks.json");
+    const tokenPilotConfigPath = join(dir, "tokenpilot.json");
+    await writeFile(codexConfigPath, [
+      "model_provider = \"OPENAI\"",
+      "",
+      "[model_providers.OPENAI]",
+      "name = \"OpenAI\"",
+      "base_url = \"https://api.openai.com/v1\"",
+      "wire_api = \"responses\"",
+      "requires_openai_auth = true",
+      "",
+    ].join("\n"), "utf8");
+    await writeFile(hooksConfigPath, JSON.stringify({
+      hooks: {
+        Stop: [
+          { matcher: ".*", hooks: [{ type: "command", command: "user-stop-hook" }] },
+          { hooks: [{ type: "command", command: "tokenpilot-codex-hook.cmd" }] },
+        ],
+      },
+    }, null, 2), "utf8");
+
+    await installCodexTokenPilot({
+      codexConfigPath,
+      hooksConfigPath,
+      tokenPilotConfigPath,
+      probeMcp: false,
+    });
+
+    const hooks = JSON.parse(await readFile(hooksConfigPath, "utf8")) as {
+      hooks?: { Stop?: Array<{ hooks?: Array<{ command?: string }> }> };
+    };
+    assert.deepEqual(hooks.hooks?.Stop, [
+      { matcher: ".*", hooks: [{ type: "command", command: "user-stop-hook" }] },
+    ]);
+  } finally {
     await rm(dir, { recursive: true, force: true });
   }
 });
@@ -393,11 +437,12 @@ test("installCodexTokenPilot writes Windows hook wrappers into hooks.json", asyn
     const hooks = JSON.parse(await readFile(hooksConfigPath, "utf8")) as {
       hooks?: Record<string, Array<{ hooks?: Array<{ command?: string }> }>>;
     };
-    for (const eventName of ["SessionStart", "PreToolUse", "PostToolUse", "Stop"]) {
+    for (const eventName of ["SessionStart", "PreToolUse", "PostToolUse"]) {
       const entries = hooks.hooks?.[eventName]?.[0]?.hooks;
       assert.ok(Array.isArray(entries), `${eventName} hook group missing`);
       assert.match(String(entries[0]?.command ?? ""), /tokenpilot-codex-hook\.cmd"$/);
     }
+    assert.equal(hooks.hooks?.Stop, undefined);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

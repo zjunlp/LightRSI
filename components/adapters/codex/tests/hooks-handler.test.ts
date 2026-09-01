@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -7,6 +8,30 @@ import test from "node:test";
 import { writeTokenPilotCodexConfig, normalizeTokenPilotCodexConfig } from "../src/config.js";
 import { processCodexHookEvent } from "../src/hooks-handler.js";
 import { indexCodexHostSessionAlias, upsertCodexSessionSnapshot } from "../src/session-state.js";
+
+function runHookHandler(input: string): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [join(__dirname, "..", "dist", "hooks-handler.js")]);
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
+    child.stderr.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
+    child.on("error", reject);
+    child.on("close", (code) => resolve({
+      code,
+      stdout: Buffer.concat(stdout).toString("utf8"),
+      stderr: Buffer.concat(stderr).toString("utf8"),
+    }));
+    child.stdin.end(input);
+  });
+}
+
+test("hook handler fails open on malformed stdin JSON", async () => {
+  const result = await runHookHandler('{"hook_event_name":"Stop","last_assistant_message":"é');
+  assert.equal(result.code, 0);
+  assert.equal(result.stdout, "{\"continue\":true}\n");
+  assert.match(result.stderr, /Unexpected end|Unterminated string|JSON/);
+});
 
 test("processCodexHookEvent records hook snapshot metadata without overriding the latest synthesized session", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lightrsi-codex-hooks-handler-"));
@@ -122,7 +147,7 @@ test("processCodexHookEvent writes directly into the synthesized session after a
   }
 });
 
-test("processCodexHookEvent returns minimal JSON output for Stop hooks", async () => {
+test("processCodexHookEvent returns an allow payload for Stop hooks", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lightrsi-codex-hooks-handler-stop-"));
   const originalCodexConfig = process.env.TOKENPILOT_CODEX_CONFIG;
   try {
@@ -144,7 +169,7 @@ test("processCodexHookEvent returns minimal JSON output for Stop hooks", async (
       cwd: "/repo/from-hook",
     });
 
-    assert.equal(output, "{}\n");
+    assert.equal(output, "{\"continue\":true}\n");
   } finally {
     if (originalCodexConfig === undefined) {
       delete process.env.TOKENPILOT_CODEX_CONFIG;

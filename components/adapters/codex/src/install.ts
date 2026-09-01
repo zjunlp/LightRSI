@@ -301,19 +301,25 @@ function asHookConfig(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function isTokenPilotHookGroup(item: Record<string, unknown>): boolean {
+  const hooks = Array.isArray(item.hooks) ? item.hooks : [];
+  return hooks.some((hook) => {
+    if (!hook || typeof hook !== "object") return false;
+    const command = (hook as Record<string, unknown>).command;
+    return typeof command === "string"
+      && (command.includes("hooks-handler.js") || command.includes("tokenpilot-codex-hook.cmd"));
+  });
+}
+
 function upsertTokenPilotHookGroup(groups: unknown, group: Record<string, unknown>): Record<string, unknown>[] {
   const list = Array.isArray(groups) ? groups.filter((item) => item && typeof item === "object") as Record<string, unknown>[] : [];
-  const isTokenPilotGroup = (item: Record<string, unknown>): boolean => {
-    const hooks = Array.isArray(item.hooks) ? item.hooks : [];
-    return hooks.some((hook) => {
-      if (!hook || typeof hook !== "object") return false;
-      const command = (hook as Record<string, unknown>).command;
-      return typeof command === "string"
-        && (command.includes("hooks-handler.js") || command.includes("tokenpilot-codex-hook.cmd"));
-    });
-  };
-  const filtered = list.filter((item) => !isTokenPilotGroup(item));
+  const filtered = list.filter((item) => !isTokenPilotHookGroup(item));
   return [...filtered, group];
+}
+
+function removeTokenPilotHookGroups(groups: unknown): Record<string, unknown>[] {
+  const list = Array.isArray(groups) ? groups.filter((item) => item && typeof item === "object") as Record<string, unknown>[] : [];
+  return list.filter((item) => !isTokenPilotHookGroup(item));
 }
 
 async function installHooksJson(params: {
@@ -346,9 +352,9 @@ async function installHooksJson(params: {
     matcher: ".*",
     hooks: [handler("Recording TokenPilot tool output", 10)],
   });
-  hooks.Stop = upsertTokenPilotHookGroup(hooks.Stop, {
-    hooks: [handler("Recording TokenPilot session stop", 10)],
-  });
+  const stopGroups = removeTokenPilotHookGroups(hooks.Stop);
+  if (stopGroups.length === 0) delete hooks.Stop;
+  else hooks.Stop = stopGroups;
 
   await mkdir(dirname(params.hooksConfigPath), { recursive: true });
   if (existsSync(params.hooksConfigPath)) {

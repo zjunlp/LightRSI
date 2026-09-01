@@ -111,8 +111,7 @@ function workspaceHintFromEvent(input: Record<string, unknown>): string | undefi
 
 function successOutputForHook(hookEventName: string): string | undefined {
   if (hookEventName === "Stop") {
-    // Stop hooks require JSON on stdout for successful exit-0 completion.
-    return "{}\n";
+    return "{\"continue\":true}\n";
   }
   return undefined;
 }
@@ -229,7 +228,14 @@ export async function processCodexHookEvent(event: Record<string, unknown>): Pro
 }
 
 async function main() {
-  const event = await readStdinJson();
+  let event: Record<string, unknown>;
+  try {
+    event = await readStdinJson();
+  } catch (err) {
+    console.error(`hook input parse failed; continuing without hook action: ${hookErrorMessage(err)}`);
+    writeSuccessOutput("Stop");
+    return;
+  }
   const output = await processCodexHookEvent(event);
   if (typeof output === "string" && output.length > 0) {
     process.stdout.write(output);

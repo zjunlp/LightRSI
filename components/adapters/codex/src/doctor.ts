@@ -90,7 +90,6 @@ const HOOK_EVENT_NAMES = [
   "SessionStart",
   "PreToolUse",
   "PostToolUse",
-  "Stop",
 ] as const;
 
 function normalizeLocalProxyBaseUrl(value: string | undefined): string | undefined {
