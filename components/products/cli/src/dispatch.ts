@@ -7,6 +7,12 @@ import type { CliHostPathOverrides } from "./context-store.js";
 import { CLI_HOSTS, parseCliHostId, resolveLatestCliReportHost, type CliHostId } from "./hosts/registry.js";
 import { createCliHostRuntime, registerBuiltInCliHostProducts } from "./hosts/factory.js";
 import { handleStandaloneVisualCommandWithSelection } from "./hosts/visual.js";
+import {
+  cleanSessionIdFromArgs,
+  formatCleanUsage,
+  handleCleanCommand,
+  resolveCleanCommandBackend,
+} from "./clean.js";
 import { formatCliUsage } from "./usage.js";
 
 registerBuiltInCliHostProducts();
@@ -181,6 +187,38 @@ export async function dispatchCli(argv: string[]): Promise<ProductCommandResult>
     sessionId: effectiveTarget.sessionId,
     pathOverrides: await resolvePathOverrides(effectiveTarget.host) ?? effectiveTarget.pathOverrides,
   });
+  if (commandArgs[0] === "clean") {
+    if (commandArgs.slice(1).some((argument) => argument === "--help" || argument === "-h")) {
+      return { text: formatCleanUsage() };
+    }
+    const requestedSessionId = cleanSessionIdFromArgs(commandArgs.slice(1)) ?? effectiveTarget.sessionId;
+    const resolvedSessionId = requestedSessionId
+      ? await runtime.resolveSessionId(requestedSessionId)
+      : await runtime.maybeResolveLatestSessionId();
+    const cleanPathOverrides = await resolvePathOverrides(effectiveTarget.host)
+      ?? effectiveTarget.pathOverrides;
+    const backend = await resolveCleanCommandBackend({
+      hostId: effectiveTarget.host,
+      sessionId: resolvedSessionId,
+      pathOverrides: cleanPathOverrides,
+    });
+    if (!backend) {
+      return {
+        text: `Context Cleaner is not registered for ${effectiveTarget.host} yet.`,
+      };
+    }
+    const result = await handleCleanCommand({
+      args: commandArgs.slice(1),
+      sessionId: resolvedSessionId,
+      backend,
+    });
+    await updateCliContextState({
+      host: effectiveTarget.host,
+      sessionId: resolvedSessionId,
+      pathOverrides: cleanPathOverrides,
+    });
+    return result;
+  }
   const result = await runtime.handleCommand({
     args: commandArgs.join(" "),
     sessionId: effectiveTarget.sessionId,

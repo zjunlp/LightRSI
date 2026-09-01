@@ -43,3 +43,4 @@ export {
   type CreateContextCleanerHostExecutionBridgeParams,
 } from "./host-execution-bridge.js";
 export * from "./recommendation.js";
+export * from "./orchestrator.js";

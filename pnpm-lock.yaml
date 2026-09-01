@@ -297,6 +297,9 @@ importers:
 
   components/products/cli:
     dependencies:
+      '@lightrsi/cleaner':
+        specifier: workspace:*
+        version: link:../../packages/features/cleaner
       '@lightrsi/host-adapter':
         specifier: workspace:*
         version: link:../../packages/foundation/host-adapter

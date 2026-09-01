@@ -1,8 +1,9 @@
 import { createProductSurfaceCommandHandler } from "@lightrsi/product-surface";
 import { TOKENPILOT_PRODUCT_SURFACE_IDENTITY } from "@lightrsi/tokenpilot";
 import type { CliHostPathOverrides } from "../context-store.js";
-import { createClaudeCodeCliBridge } from "./claude-code.js";
-import { createCodexCliBridge } from "./codex.js";
+import { registerCleanCommandBackendResolver } from "../clean.js";
+import { createClaudeCodeCleanCommandBackend, createClaudeCodeCliBridge } from "./claude-code.js";
+import { createCodexCleanCommandBackend, createCodexCliBridge } from "./codex.js";
 import { createOpenClawCliBridge } from "./openclaw.js";
 import {
   CLI_HOSTS,
@@ -53,6 +54,11 @@ const CLI_HOST_REGISTRATIONS: CliHostRegistration[] = CLI_HOSTS.map((host) => ({
 
 export function registerBuiltInCliHostProducts(): void {
   registerCliHostProducts(CLI_HOST_REGISTRATIONS);
+  registerCleanCommandBackendResolver(({ hostId, pathOverrides }) => {
+    if (hostId === "codex") return createCodexCleanCommandBackend(pathOverrides);
+    if (hostId === "claude-code") return createClaudeCodeCleanCommandBackend(pathOverrides);
+    return undefined;
+  });
 }
 
 export function createCliHostRuntime(target: {
