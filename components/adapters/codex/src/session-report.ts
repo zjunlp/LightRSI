@@ -20,6 +20,10 @@ import type {
   CodexRebaseEpochStatus,
 } from "./context-rewrite/types.js";
 import {
+  readCodexCleanerObservability,
+  type CodexCleanerObservability,
+} from "./context-cleaner/observability.js";
+import {
   loadCodexRecentTurnBindings,
   loadCodexSessionSnapshot,
   resolveCanonicalCodexSessionId,
@@ -73,6 +77,23 @@ function latestCooldown(cooldowns: CodexRebaseCooldown[]): CodexRebaseCooldown |
 
 function formatCharsAndTokens(chars: number, tokens: number): string {
   return `${chars} chars (~${tokens} tokens)`;
+}
+
+function formatCleanerSavings(
+  value: CodexCleanerObservability["savings"]["estimated"],
+  availability: CodexCleanerObservability["availability"],
+): string {
+  if (!value) return availability === "degraded" ? "unknown" : "none";
+  return `${value.tokens === null ? "tokens unavailable" : `${value.tokens} tokens`}, ${value.chars} chars`;
+}
+
+function buildCodexCleanerReportLines(observation: CodexCleanerObservability): string[] {
+  return [
+    `- Cleaner estimated savings: ${formatCleanerSavings(observation.savings.estimated, observation.availability)}`,
+    `- Cleaner scheduled savings: ${formatCleanerSavings(observation.savings.scheduled, observation.availability)}`,
+    `- Cleaner applied savings: ${formatCleanerSavings(observation.savings.applied, observation.availability)}`,
+    `- Cleaner fallback count: ${observation.fallbackCount ?? "unknown"}`,
+  ];
 }
 
 function formatCodexRebaseAccounting(epoch: CodexRebaseEpoch): string | undefined {
@@ -215,6 +236,9 @@ export async function renderCodexSessionReport(stateDir: string, sessionRef?: st
     ? summarizeCodexCacheAudit(cacheAuditRecords)
     : null;
   const rebaseReportLines = await buildCodexRebaseReportLines(stateDir, topology.sessionId);
+  const cleanerReportLines = buildCodexCleanerReportLines(
+    await readCodexCleanerObservability({ stateDir, sessionId: topology.sessionId }),
+  );
 
   const baseReport = await renderSessionReport({
     stateDir,
@@ -228,7 +252,5 @@ export async function renderCodexSessionReport(stateDir: string, sessionRef?: st
       readAggregate: readUxSessionAggregate,
     },
   });
-  return rebaseReportLines.length > 0
-    ? `${baseReport}\n${rebaseReportLines.join("\n")}`
-    : baseReport;
+  return `${baseReport}\n${[...rebaseReportLines, ...cleanerReportLines].join("\n")}`;
 }

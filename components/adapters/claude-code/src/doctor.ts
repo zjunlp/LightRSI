@@ -22,6 +22,12 @@ import {
 import { resolveClaudeCodeHookCommandForInstall } from "./install.js";
 import { resolveClaudeCodeMcpServerSpecForInstall } from "./install.js";
 import { inspectClaudeTaskStateEstimatorConfig } from "./context-rewrite/estimator-config.js";
+import {
+  emptyClaudeCleanerObservability,
+  readClaudeCleanerObservability,
+  type ClaudeCleanerObservability,
+} from "./context-cleaner/observability.js";
+import { resolveLatestClaudeCodeSessionId } from "./session-state.js";
 
 export type ClaudeCodeDoctorReport = {
   settingsPath: string;
@@ -61,6 +67,7 @@ export type ClaudeCodeDoctorReport = {
   coreRuntimeHealthy: boolean;
   recoveryMcpHealthy: boolean;
   degradedMode: boolean;
+  cleaner?: ClaudeCleanerObservability;
 };
 
 const HOOK_EVENT_NAMES = [
@@ -106,6 +113,7 @@ function remediationLines(report: ClaudeCodeDoctorReport): string[] {
 }
 
 export function formatClaudeCodeDoctorReport(report: ClaudeCodeDoctorReport): string {
+  const cleaner = report.cleaner ?? emptyClaudeCleanerObservability();
   const lines = [
     "TokenPilot Claude Code doctor:",
     `- tokenpilot config: ${report.tokenPilotConfigPath}`,
@@ -145,6 +153,11 @@ export function formatClaudeCodeDoctorReport(report: ClaudeCodeDoctorReport): st
     `- state dir exists: ${report.stateDirExists ? "yes" : "no"}`,
     `- session state available: ${report.sessionStateAvailable ? "yes" : "no"}`,
     `- ux effects available: ${report.uxEffectsAvailable ? "yes" : "no"}`,
+    `- Cleaner capability: ${cleaner.availability}`,
+    `- Cleaner plan store: ${cleaner.planStore}`,
+    `- Cleaner pending plan: ${cleaner.pendingPlan}`,
+    `- Cleaner last receipt: ${cleaner.lastReceipt}`,
+    `- Cleaner rewrite mode: ${cleaner.rewriteMode}`,
   ];
   if (report.degradedMode) {
     lines.push(
@@ -172,6 +185,10 @@ export async function inspectClaudeCodeDoctor(params: {
   const proxyBaseUrl = proxyBaseUrlForPort(params.config.proxyPort);
   const expectedHookCommand = resolveClaudeCodeHookCommandForInstall();
   const expectedMcpSpec = resolveClaudeCodeMcpServerSpecForInstall(params.config.stateDir);
+  const latestSessionId = await resolveLatestClaudeCodeSessionId(params.config.stateDir);
+  const cleaner = latestSessionId
+    ? await readClaudeCleanerObservability({ stateDir: params.config.stateDir, sessionId: latestSessionId })
+    : emptyClaudeCleanerObservability();
   let settingsInstalled = false;
   let routedViaGateway = false;
   let toolSearchEnabled = false;
@@ -297,5 +314,6 @@ export async function inspectClaudeCodeDoctor(params: {
     coreRuntimeHealthy,
     recoveryMcpHealthy,
     degradedMode: coreRuntimeHealthy && !recoveryMcpHealthy,
+    cleaner,
   };
 }
