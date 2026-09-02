@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@lightrsi/artifact-store": "workspace:*",
+    "@lightrsi/cleaner": "workspace:*",
     "@lightrsi/tokenpilot": "workspace:*",
     "@lightrsi/eviction": "workspace:*",
     "@lightrsi/host-adapter": "workspace:*",

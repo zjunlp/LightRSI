@@ -17,6 +17,7 @@ Current adapter responsibilities:
 - request-time reduction
 - tool-result persistence
 - canonical history rewrite and eviction
+- user-approved Context Cleaner snapshot and immediate canonical apply
 - recovery protocol and recovery tool wiring
 
 ## Install
@@ -53,6 +54,22 @@ Or use the standalone CLI:
 cd /path/to/LightRSI
 lightrsi openclaw doctor
 ```
+
+Analyze an OpenClaw session without changing its context:
+
+```bash
+lightrsi openclaw clean --session <session-id>
+```
+
+Apply only tasks selected from that immutable plan:
+
+```bash
+lightrsi openclaw clean --plan <plan-id> --select <task-id,...>
+```
+
+OpenClaw archives selected task content before atomically committing the
+canonical rewrite. Unlike scheduled Codex and Claude Code rewrites, a successful
+OpenClaw command returns an `applied` receipt immediately.
 
 Development-style install should use source build + runtime sync instead of mixing release and load-path installs. The current sanity workflow is:
 
