@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
+  acquireClaudeCleanerScheduleLock,
   readClaudeCleanerSchedule,
   scheduleClaudeCleanerPlan,
 } from "../src/context-cleaner/scheduler.js";
@@ -45,5 +46,35 @@ test("stores one replay-safe Claude schedule for the frozen selected task ids", 
     assert.deepEqual(current.record.selectedTaskIds, ["task-completed"]);
     assert.equal(current.record.cleanPlanId, PLAN);
     assert.equal(current.record.baseRevision, REVISION);
+  });
+});
+
+test("Claude cleaner schedule lock waits for its owner when the wall clock jumps forward", async () => {
+  await withTempState(async (stateDir) => {
+    const firstLock = await acquireClaudeCleanerScheduleLock({ stateDir, sessionId: SESSION });
+    assert.ok(firstLock);
+    const originalDateNow = Date.now;
+    let lockClockCalls = 0;
+
+    Object.defineProperty(Date, "now", {
+      configurable: true,
+      value: () => {
+        const stack = new Error().stack ?? "";
+        if (!stack.includes("acquireClaudeCleanerScheduleLock")) return originalDateNow();
+        lockClockCalls += 1;
+        return lockClockCalls <= 3 ? 1_000 : 12_000;
+      },
+    });
+
+    try {
+      const secondLock = acquireClaudeCleanerScheduleLock({ stateDir, sessionId: SESSION });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      await firstLock?.release();
+      assert.ok(await secondLock);
+      await (await secondLock)?.release();
+    } finally {
+      Object.defineProperty(Date, "now", { configurable: true, value: originalDateNow });
+      await firstLock?.release();
+    }
   });
 });

@@ -16,12 +16,19 @@ export type CliContextState = {
   lastUpdatedAt?: string;
 };
 
+export function resolveCliHomeDir(
+  env: NodeJS.ProcessEnv = process.env,
+  fallbackHome = homedir(),
+): string {
+  return env.HOME?.trim() || env.USERPROFILE?.trim() || fallbackHome;
+}
+
 export function defaultCliContextPath(): string {
-  return join(homedir(), ".lightrsi", "state", "cli-context.json");
+  return join(resolveCliHomeDir(), ".lightrsi", "state", "cli-context.json");
 }
 
 export function legacyCliContextPath(): string {
-  return join(homedir(), ".lightmem2", "state", "cli-context.json");
+  return join(resolveCliHomeDir(), ".lightmem2", "state", "cli-context.json");
 }
 
 function emptyCliContextState(): CliContextState {

@@ -29,10 +29,15 @@ test("clean renderer shows task-level accounting without item ids", () => {
   assert.match(text, /Context usage: 80 \/ 100 tok \(80\.0%\)/);
   assert.match(text, /Protected context: 10 tok/);
   assert.match(text, /Unassigned context: 0 tok/);
-  assert.match(text, /\[ \].*task-a.*Finished the requested work.*60 tok.*75\.0%.*clean/);
-  assert.match(text, /\[-\].*task-current.*Work in progress.*20 tok.*25\.0%.*protected/);
+  assert.match(text, /\[ \].*task-a.*60 tok.*75\.0%.*clean/);
+  assert.match(text, /\[-\].*task-current.*20 tok.*25\.0%.*protected/);
   assert.match(text, /completed_and_cold/);
-  assert.match(text, /Reasons task-a: completed_and_cold/);
+  assert.match(text, /Task details:\n- task-a: Finished the requested work/);
+  assert.match(text, /Reason codes:\n- task-a: completed_and_cold/);
+  assert.doesNotMatch(text, /…|—/);
+  const taskRows = text.split("\n").filter((line) => /^\[(?: |-)\]/.test(line));
+  assert.equal(taskRows.length, 2);
+  assert.ok(taskRows.every((line) => line.length <= 100));
   assert.doesNotMatch(text, /item-/);
 });
 
@@ -47,7 +52,28 @@ test("receipt renderer distinguishes estimates from applied savings", () => {
     appliedSavedChars: 220,
     deferredTaskIds: [],
     reasons: [],
+    fallbackUsed: false,
   });
   assert.match(text, /Estimated savings: 60 tok/);
-  assert.match(text, /Released: 55 tok/);
+  assert.match(text, /Scheduled savings: 60 tok/);
+  assert.match(text, /Applied savings: 55 tok/);
+  assert.match(text, /Fallback count: 0/);
+});
+
+test("receipt renderer never represents scheduled estimates as applied savings", () => {
+  const text = renderCleanReceipt({
+    planId: "plan-1",
+    status: "scheduled",
+    selectedTaskIds: ["task-a"],
+    estimatedSavedTokens: 60,
+    estimatedSavedChars: 240,
+    deferredTaskIds: [],
+    reasons: [],
+    fallbackUsed: true,
+  });
+  assert.match(text, /Estimated savings: 60 tok/);
+  assert.match(text, /Scheduled savings: 60 tok/);
+  assert.match(text, /Applied savings: not applied/);
+  assert.match(text, /Fallback count: 1/);
+  assert.doesNotMatch(text, /Applied savings: 60 tok/);
 });

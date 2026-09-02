@@ -60,6 +60,10 @@ type NormalizeClaudeCodeConfigOptions = {
   configPath?: string;
 };
 
+function runtimeHomeDir(): string {
+  return process.env.HOME?.trim() || process.env.USERPROFILE?.trim() || homedir();
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -112,27 +116,27 @@ function sanitizeClaudeReductionPassOptions(raw: unknown): Record<string, Record
 }
 
 export function expandHomePath(value: string): string {
-  if (value === "~") return homedir();
-  if (value.startsWith("~/")) return join(homedir(), value.slice(2));
+  if (value === "~") return runtimeHomeDir();
+  if (value.startsWith("~/")) return join(runtimeHomeDir(), value.slice(2));
   return value;
 }
 
 export function defaultClaudeCodeSettingsPath(): string {
   return process.env.CLAUDE_CODE_SETTINGS_PATH
     ? resolve(process.env.CLAUDE_CODE_SETTINGS_PATH)
-    : join(homedir(), ".claude", "settings.json");
+    : join(runtimeHomeDir(), ".claude", "settings.json");
 }
 
 export function defaultClaudeCodeMcpConfigPath(): string {
   return process.env.CLAUDE_CODE_MCP_CONFIG_PATH
     ? resolve(process.env.CLAUDE_CODE_MCP_CONFIG_PATH)
-    : join(homedir(), ".claude", ".claude.json");
+    : join(runtimeHomeDir(), ".claude", ".claude.json");
 }
 
 export function defaultTokenPilotClaudeCodeConfigPath(): string {
   return process.env.TOKENPILOT_CLAUDE_CODE_CONFIG
     ? resolve(process.env.TOKENPILOT_CLAUDE_CODE_CONFIG)
-    : join(homedir(), ".claude", "tokenpilot.json");
+    : join(runtimeHomeDir(), ".claude", "tokenpilot.json");
 }
 
 export function defaultClaudeCodeStateDir(configPath = defaultTokenPilotClaudeCodeConfigPath()): string {

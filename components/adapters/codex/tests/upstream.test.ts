@@ -1,11 +1,76 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type IncomingHttpHeaders } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { requestUpstreamResponses } from "../src/upstream.js";
+import {
+  CODEX_CHATGPT_UPSTREAM_BASE_URL,
+  requestUpstreamResponses,
+  resolveCodexRequestUpstream,
+} from "../src/upstream.js";
+
+test("built-in OpenAI requests use the ChatGPT Codex endpoint for ChatGPT-authenticated accounts", () => {
+  const upstream = { baseUrl: "https://api.openai.com/v1", wireApi: "responses" as const };
+  assert.deepEqual(resolveCodexRequestUpstream({
+    upstream,
+    upstreamProvider: "openai",
+    inboundHeaders: { "ChatGPT-Account-Id": "account-fixture" },
+  }), {
+    ...upstream,
+    baseUrl: CODEX_CHATGPT_UPSTREAM_BASE_URL,
+  });
+  assert.equal(resolveCodexRequestUpstream({
+    upstream,
+    upstreamProvider: "openai",
+    inboundHeaders: { authorization: "Bearer api-key-fixture" },
+  }), upstream);
+});
+
+test("enhanced Responses forwarding preserves ChatGPT authentication context headers", async () => {
+  let receivedHeaders: IncomingHttpHeaders | undefined;
+  const server = createServer(async (req, res) => {
+    receivedHeaders = req.headers;
+    for await (const _chunk of req) {
+      // Drain the request body before replying.
+    }
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ status: "completed", output: [] }));
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("fixture did not bind a port");
+  try {
+    const response = await requestUpstreamResponses({
+      upstream: {
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        wireApi: "responses",
+        requiresOpenAIAuth: true,
+      },
+      payload: { model: "gpt-fixture", input: [] },
+      inboundAuthorization: "Bearer chatgpt-token-fixture",
+      inboundHeaders: {
+        authorization: "Bearer chatgpt-token-fixture",
+        "chatgpt-account-id": "account-fixture",
+        originator: "codex_cli_rs",
+      },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(receivedHeaders?.authorization, "Bearer chatgpt-token-fixture");
+    assert.equal(receivedHeaders?.["chatgpt-account-id"], "account-fixture");
+    assert.equal(receivedHeaders?.originator, "codex_cli_rs");
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
 
 async function withReasoningFixture(
   responses: Array<{ encrypted?: string }>,

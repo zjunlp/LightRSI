@@ -43,13 +43,11 @@ export function resolveCleanCommandBackend(params: {
   return Promise.resolve(backendResolver?.(params));
 }
 
-type ParsedCleanArgs = {
-  sessionId?: string;
-  planId?: string;
-  selectedTaskIds?: string[];
-  status: boolean;
-  cancel: boolean;
-};
+type ParsedCleanArgs =
+  | { action: "analyze"; sessionId?: string }
+  | { action: "approve"; planId: string; selectedTaskIds: string[] }
+  | { action: "status"; planId: string }
+  | { action: "cancel"; planId: string };
 
 export function formatCleanUsage(): string {
   return [
@@ -62,51 +60,41 @@ export function formatCleanUsage(): string {
 }
 
 function parseCleanArgs(args: string[]): ParsedCleanArgs {
-  const parsed: ParsedCleanArgs = { status: false, cancel: false };
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-    if (argument === "--plan") {
-      const value = args[++index]?.trim();
-      if (!value) throw new Error("clean_plan_id_missing");
-      if (parsed.planId) throw new Error("clean_plan_id_duplicate");
-      parsed.planId = value;
-    } else if (argument === "--session") {
-      const value = args[++index]?.trim();
-      if (!value) throw new Error("clean_session_id_missing");
-      if (parsed.sessionId) throw new Error("clean_session_id_duplicate");
-      parsed.sessionId = value;
-    } else if (argument === "--select") {
-      const value = args[++index]?.trim();
-      if (!value) throw new Error("clean_selection_missing");
-      if (parsed.selectedTaskIds) throw new Error("clean_selection_duplicate_argument");
-      parsed.selectedTaskIds = value.split(",").map((taskId) => taskId.trim()).filter(Boolean);
-    } else if (argument === "--status" || argument === "--cancel") {
-      const action = argument === "--status" ? "status" : "cancel";
-      if (parsed[action]) throw new Error(`clean_${action}_duplicate`);
-      parsed[action] = true;
-      const possiblePlanId = args[index + 1]?.trim();
-      if (possiblePlanId && !possiblePlanId.startsWith("--")) {
-        index += 1;
-        if (parsed.planId && parsed.planId !== possiblePlanId) throw new Error("clean_plan_id_conflict");
-        parsed.planId = possiblePlanId;
-      }
-    } else if (argument === "--help" || argument === "-h") throw new Error("clean_help");
-    else throw new Error(`clean_argument_unknown:${argument}`);
+  if (args.length === 0) return { action: "analyze" };
+  if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
+    throw new Error("clean_help");
   }
-  const actions = Number(parsed.selectedTaskIds !== undefined) + Number(parsed.status) + Number(parsed.cancel);
-  if (actions > 1) throw new Error("clean_action_conflict");
-  if (actions > 0 && !parsed.planId) throw new Error("clean_plan_id_missing");
-  if (parsed.planId && actions === 0) throw new Error("clean_action_missing");
-  return parsed;
+
+  const valueAt = (index: number, missingError: string): string => {
+    const value = args[index]?.trim();
+    if (!value || value.startsWith("--")) throw new Error(missingError);
+    return value;
+  };
+
+  if (args.length === 2 && args[0] === "--session") {
+    return { action: "analyze", sessionId: valueAt(1, "clean_session_id_missing") };
+  }
+  if (args.length === 2 && args[0] === "--status") {
+    return { action: "status", planId: valueAt(1, "clean_plan_id_missing") };
+  }
+  if (args.length === 2 && args[0] === "--cancel") {
+    return { action: "cancel", planId: valueAt(1, "clean_plan_id_missing") };
+  }
+  if (args.length === 4 && args[0] === "--plan" && args[2] === "--select") {
+    const selectedTaskIds = valueAt(3, "clean_selection_missing").split(",").map((taskId) => taskId.trim());
+    if (selectedTaskIds.some((taskId) => !taskId)) throw new Error("clean_selection_malformed");
+    return {
+      action: "approve",
+      planId: valueAt(1, "clean_plan_id_missing"),
+      selectedTaskIds,
+    };
+  }
+  throw new Error("clean_argument_syntax");
 }
 
 export function cleanSessionIdFromArgs(args: string[]): string | undefined {
-  const indexes = args.flatMap((argument, index) => argument === "--session" ? [index] : []);
-  if (indexes.length === 0) return undefined;
-  if (indexes.length > 1) throw new Error("clean_session_id_duplicate");
-  const sessionId = args[indexes[0]! + 1]?.trim();
-  if (!sessionId || sessionId.startsWith("--")) throw new Error("clean_session_id_missing");
-  return sessionId;
+  const parsed = parseCleanArgs(args);
+  return parsed.action === "analyze" ? parsed.sessionId : undefined;
 }
 
 function validateSelection(plan: CleanPlanView, selectedTaskIds: string[]): string[] {
@@ -130,6 +118,22 @@ async function approveSelection(
   return renderCleanReceipt(await backend.approve(plan.planId, selected));
 }
 
+function renderNonInteractiveAnalysis(plan: CleanPlanView, rendered: string): string {
+  const selectableTasks = plan.tasks.filter((task) => task.selectable);
+  const choices = selectableTasks.length === 0
+    ? "No selectable tasks are available; no changes were applied."
+    : [
+      "Selectable tasks:",
+      "None selected by default.",
+      ...selectableTasks.map((task, index) => `${index + 1}. ${task.taskId} - ${task.label}`),
+      "Choose task IDs explicitly after reviewing this plan.",
+    ].join("\n");
+  const nextCommand = selectableTasks.length === 0
+    ? ""
+    : ` Apply with --plan ${plan.planId} --select <task-id[,task-id...]>`;
+  return `${rendered}\n\n${choices}\n\nAnalysis only (non-interactive).${nextCommand}`;
+}
+
 export async function handleCleanCommand(params: {
   args: string[];
   sessionId?: string;
@@ -145,15 +149,15 @@ export async function handleCleanCommand(params: {
     throw error;
   }
 
-  if (parsed.planId) {
-    if (parsed.status) {
-      const receipt = await params.backend.readReceipt(parsed.planId);
-      return { text: receipt ? renderCleanReceipt(receipt) : `Context clean receipt not found: ${parsed.planId}` };
-    }
-    if (parsed.cancel) return { text: renderCleanReceipt(await params.backend.cancel(parsed.planId)) };
+  if (parsed.action === "status") {
+    const receipt = await params.backend.readReceipt(parsed.planId);
+    return { text: receipt ? renderCleanReceipt(receipt) : `Context clean receipt not found: ${parsed.planId}` };
+  }
+  if (parsed.action === "cancel") return { text: renderCleanReceipt(await params.backend.cancel(parsed.planId)) };
+  if (parsed.action === "approve") {
     const plan = await params.backend.readPlan(parsed.planId);
     if (!plan) throw new Error(`clean_plan_missing:${parsed.planId}`);
-    return { text: await approveSelection(params.backend, plan, parsed.selectedTaskIds!) };
+    return { text: await approveSelection(params.backend, plan, parsed.selectedTaskIds) };
   }
 
   const sessionId = parsed.sessionId ?? params.sessionId?.trim();
@@ -162,12 +166,15 @@ export async function handleCleanCommand(params: {
   const rendered = renderCleanPlan(plan);
   const interactive = params.interactive ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
   if (!interactive) {
-    return {
-      text: `${rendered}\n\nAnalysis only (non-interactive). Apply with --plan ${plan.planId} --select <task-id[,task-id...]>`,
-    };
+    return { text: renderNonInteractiveAnalysis(plan, rendered) };
   }
+  const terminalPromptOwnsPlanOutput = params.prompt === undefined
+    && Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  const resultText = (summary: string) => terminalPromptOwnsPlanOutput
+    ? summary
+    : `${rendered}\n\n${summary}`;
   const selection = await (params.prompt ?? promptForCleanTasks)(plan);
-  if (selection === undefined) return { text: `${rendered}\n\nContext clean cancelled; no changes were applied.` };
-  if (selection.length === 0) return { text: `${rendered}\n\nNo tasks selected; no changes were applied.` };
-  return { text: `${rendered}\n\n${await approveSelection(params.backend, plan, selection)}` };
+  if (selection === undefined) return { text: resultText("Context clean cancelled; no changes were applied.") };
+  if (selection.length === 0) return { text: resultText("No tasks selected; no changes were applied.") };
+  return { text: resultText(await approveSelection(params.backend, plan, selection)) };
 }

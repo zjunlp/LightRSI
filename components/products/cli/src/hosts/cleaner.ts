@@ -58,6 +58,7 @@ function receiptView(receipt: ContextCleanReceipt): CleanReceiptView {
           appliedSavedChars: receipt.appliedSavedChars,
         }
       : {}),
+    fallbackUsed: receipt.fallbackUsed,
     deferredTaskIds: [...receipt.deferredTaskIds],
     reasons: [...receipt.reasons],
   };

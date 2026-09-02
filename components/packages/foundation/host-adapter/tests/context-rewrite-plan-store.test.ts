@@ -545,6 +545,49 @@ test("stale session lock is recovered while a live lock causes bypass", async ()
   }
 });
 
+test("plan store waits for a live session lock when the wall clock jumps forward", async () => {
+  const stateDir = await mkdtemp(join(tmpdir(), "lightrsi-plan-store-monotonic-lock-"));
+  const originalDateNow = Date.now;
+  try {
+    const plan = createPlan("plan-monotonic-lock");
+    const lockPath = contextMutationPlanLockPath(stateDir, plan.sessionId);
+    await mkdir(lockPath, { recursive: true });
+    await writeFile(join(lockPath, "owner.json"), JSON.stringify({
+      token: "live-owner",
+      pid: process.pid,
+      hostname: hostname(),
+      createdAt: new Date().toISOString(),
+    }), "utf8");
+
+    let lockClockCalls = 0;
+    Object.defineProperty(Date, "now", {
+      configurable: true,
+      value: () => {
+        const stack = new Error().stack ?? "";
+        if (!stack.includes("acquireSessionLock")) return originalDateNow();
+        lockClockCalls += 1;
+        if (lockClockCalls === 1) return 1_000;
+        if (lockClockCalls === 2) return originalDateNow();
+        return 12_000;
+      },
+    });
+
+    const stored = saveActiveContextMutationPlan({
+      stateDir,
+      plan,
+      lock: { lockTimeoutMs: 500, lockRetryMs: 10 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    await rm(lockPath, { recursive: true, force: true });
+
+    const result = await stored;
+    assert.equal(result.outcome, "stored");
+  } finally {
+    Object.defineProperty(Date, "now", { configurable: true, value: originalDateNow });
+    await rm(stateDir, { recursive: true, force: true });
+  }
+});
+
 test("concurrent stale-lock recovery does not remove a new lock owner", async () => {
   const stateDir = await mkdtemp(join(tmpdir(), "lightrsi-plan-store-stale-race-"));
   try {

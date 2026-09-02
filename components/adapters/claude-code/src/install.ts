@@ -82,7 +82,7 @@ function adapterRootFromHere(moduleDir = __dirname): string {
 }
 
 function shellQuote(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
+  return `"${value.replace(/"/g, "\\\"")}"`;
 }
 
 function tokenPilotHookCommand(adapterRoot: string): string {
@@ -173,6 +173,7 @@ export async function installClaudeCodeTokenPilot(params?: {
   probeMcp?: boolean;
   cliBinDir?: string;
   cliContextPath?: string;
+  platform?: NodeJS.Platform;
 }): Promise<{
   settingsPath: string;
   mcpConfigPath: string;
@@ -193,9 +194,11 @@ export async function installClaudeCodeTokenPilot(params?: {
   commandSkillNames: string[];
   cliBinInstalled: boolean;
   cliBinPath: string;
+  cliLauncherPath?: string;
   cliBinDir: string;
   cliBinDirOnPath: boolean;
   hostCliBinPath?: string;
+  hostCliLauncherPath?: string;
   mcpProbe: {
     ok: boolean;
     detail: string;
@@ -307,12 +310,14 @@ export async function installClaudeCodeTokenPilot(params?: {
   const cliBin = await installLightRsiCliBin({
     adapterRoot: adapterRootFromHere(),
     binDir: params?.cliBinDir,
+    platform: params?.platform,
   });
   const hostCliBin = cliBin.installed
     ? await installHostCliBin({
       adapterRoot: adapterRootFromHere(),
       host: "claude-code",
       binDir: cliBin.binDir,
+      platform: params?.platform,
     })
     : undefined;
   await rememberCliHostPathOverrides("claude-code", {
@@ -352,9 +357,11 @@ export async function installClaudeCodeTokenPilot(params?: {
     commandSkillNames: commandSkillBridge.skillNames,
     cliBinInstalled: cliBin.installed,
     cliBinPath: cliBin.binPath,
+    cliLauncherPath: cliBin.launcherPath,
     cliBinDir: cliBin.binDir,
     cliBinDirOnPath: cliBin.binDirOnPath,
     hostCliBinPath: hostCliBin?.binPath,
+    hostCliLauncherPath: hostCliBin?.launcherPath,
     mcpProbe: {
       ...mcpProbe,
       degraded: !mcpProbe.ok,

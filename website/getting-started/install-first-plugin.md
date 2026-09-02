@@ -30,8 +30,7 @@ pnpm component:install:tokenpilot:openclaw
 ### Codex
 
 ```bash
-npm --prefix components/adapters/codex run build
-npm --prefix components/adapters/codex run install:codex
+corepack pnpm cleaner:install:codex
 ```
 
 This command:
@@ -39,6 +38,7 @@ This command:
 - Writes `~/.codex/tokenpilot.json`
 - Registers hooks in `~/.codex/hooks.json`
 - Registers the shared `tokenpilot_memory_fault_recover` MCP server
+- Builds and installs the shared `lightrsi` CLI and the analysis-only `lightrsi-clean` skill
 
 **Custom paths:**
 
@@ -46,15 +46,13 @@ This command:
 export CODEX_CONFIG_PATH="/path/to/config.toml"
 export CODEX_HOOKS_CONFIG_PATH="/path/to/hooks.json"
 export TOKENPILOT_CODEX_CONFIG="/path/to/tokenpilot.json"
-npm --prefix components/adapters/codex run build
-npm --prefix components/adapters/codex run install:codex
+corepack pnpm cleaner:install:codex
 ```
 
 ### Claude Code
 
 ```bash
-npm --prefix components/adapters/claude-code run build
-npm --prefix components/adapters/claude-code run install:claude-code
+corepack pnpm cleaner:install:claude-code
 ```
 
 This command:
@@ -63,6 +61,7 @@ This command:
 - Registers the shared `tokenpilot_memory_fault_recover` MCP server
 - Installs a `SessionStart` hook that auto-starts the gateway
 - Backs up existing Claude files as `.tokenpilot.bak`
+- Builds and installs the shared `lightrsi` CLI and the analysis-only `lightrsi-clean` skill
 
 **Custom paths:**
 
@@ -70,8 +69,7 @@ This command:
 export CLAUDE_CODE_SETTINGS_PATH="/path/to/settings.json"
 export CLAUDE_CODE_MCP_CONFIG_PATH="/path/to/.claude.json"
 export TOKENPILOT_CLAUDE_CODE_CONFIG="/path/to/tokenpilot.json"
-npm --prefix components/adapters/claude-code run build
-npm --prefix components/adapters/claude-code run install:claude-code
+corepack pnpm cleaner:install:claude-code
 ```
 
 ## Verify Installation
@@ -86,6 +84,8 @@ Or check per-host:
 lightrsi openclaw doctor
 lightrsi codex doctor
 lightrsi claude-code doctor
+lightrsi codex clean --help
+lightrsi claude-code clean --help
 ```
 
 Look for: `plugin entry enabled`, `config enabled`, `proxy healthy: yes`.

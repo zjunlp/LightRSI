@@ -5,9 +5,24 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   readCliContextState,
+  resolveCliHomeDir,
   updateCliContextState,
   writeCliContextState,
 } from "../src/context-store.js";
+
+test("context store honors an explicit HOME before the Windows user profile", () => {
+  assert.equal(
+    resolveCliHomeDir(
+      { HOME: "/tmp/isolated-home", USERPROFILE: "C:\\Users\\real-user" },
+      "C:\\Users\\fallback-user",
+    ),
+    "/tmp/isolated-home",
+  );
+  assert.equal(
+    resolveCliHomeDir({ USERPROFILE: "C:\\Users\\isolated-user" }, "C:\\Users\\fallback-user"),
+    "C:\\Users\\isolated-user",
+  );
+});
 
 test("context store reads empty state by default and persists updates", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lightrsi-cli-context-"));

@@ -24,7 +24,7 @@ Supported:
 - lightweight session-state and ux-effects tracking
 - shared browser visual via `lightrsi claude-code visual`
 - standalone `lightrsi claude-code ...` command surface
-- local read-only Claude Code skill bridge for `status` / `report` / `doctor` / `visual`
+- local constrained Claude Code skill bridge for `status` / `report` / `doctor` / `visual` / `clean`
 
 Current limitations:
 
@@ -43,14 +43,16 @@ node /path/to/package/dist/install-claude-code.js
 
 The release archive is self-contained: its hooks, recovery MCP server, `lightrsi` command, and `tokenpilot-claude-code` command all run from the extracted package directory. Keep that directory in place after installation.
 
-For a source checkout, build the adapter first:
-
-Build the adapter:
+For a source checkout, use the one-pass Cleaner installation flow:
 
 ```bash
 cd /path/to/LightRSI
-npm --prefix components/adapters/claude-code run build
+corepack pnpm cleaner:install:claude-code
 ```
+
+Use `--skip-build` only for a verified existing build. The source installer
+rejects missing or stale CLI, MCP, and adapter artifacts before it changes
+Claude Code configuration.
 
 If your Claude Code files are not under the default `~/.claude`, set:
 
@@ -60,11 +62,11 @@ export CLAUDE_CODE_MCP_CONFIG_PATH="/path/to/.claude.json"
 export TOKENPILOT_CLAUDE_CODE_CONFIG="/path/to/tokenpilot.json"
 ```
 
-Then install:
+Then run the same one-pass installer:
 
 ```bash
 cd /path/to/LightRSI
-npm --prefix components/adapters/claude-code run install:claude-code
+corepack pnpm cleaner:install:claude-code
 ```
 
 If `lightrsi` is not found after install, make sure `~/.local/bin` is on your `PATH`.
@@ -76,7 +78,7 @@ The installer will:
 - write TokenPilot runtime config to `~/.claude/tokenpilot.json`
 - register the shared `tokenpilot_memory_fault_recover` MCP server in `~/.claude/.claude.json`
 - install a `SessionStart` hook that auto-starts the local TokenPilot gateway on first use
-- install read-only Claude Code skill bridge entries under the local Claude skills directory
+- install constrained Claude Code command skills under the local Claude skills directory
 - preserve existing Claude files as `.tokenpilot.bak` backups before rewriting
 - write a conservative `startup_timeout_sec` for the recovery MCP server
 - run a post-install MCP startup probe and report degraded mode if recovery MCP is still unavailable
@@ -87,8 +89,13 @@ The installed Claude Code skill bridge currently creates these explicit skills:
 - `lightrsi-report`
 - `lightrsi-doctor`
 - `lightrsi-visual`
+- `lightrsi-clean` (explicit, analysis-only; it never selects or confirms a clean)
 
 These are host entry points, not a separate runtime implementation. They call the existing `lightrsi claude-code ...` CLI surface underneath.
+
+On Windows the installer also creates `lightrsi.cmd` and
+`tokenpilot-claude-code.cmd`. If the npm command directory is already on `PATH`,
+these commands are available immediately in a new CMD or PowerShell terminal.
 
 ## Verify
 

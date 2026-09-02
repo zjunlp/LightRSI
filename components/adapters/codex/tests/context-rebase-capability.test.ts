@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   appendCodexRebaseCapability,
+  acquireCodexRebaseSessionLock,
   classifyCodexRebaseCapabilityRejection,
   CODEX_REBASE_API_VERSION,
   CODEX_REBASE_CAPABILITY_LEGACY_SCHEMA,
@@ -95,6 +96,35 @@ async function decisionsFor(params: {
     acceptedEvidence: params.acceptedEvidence,
   });
 }
+
+test("CDR-05 capability journal waits for its owner when the wall clock jumps forward", async () => {
+  await withTempState(async (stateDir) => {
+    const owner = await acquireCodexRebaseSessionLock({
+      stateDir,
+      sessionId: "__provider-capabilities-journal__",
+    });
+    assert.ok(owner);
+
+    const originalNow = Date.now;
+    let calls = 0;
+    Date.now = () => (calls++ === 0 ? 1_000 : 12_000);
+    try {
+      const releaseTimer = setTimeout(() => {
+        void owner.release();
+      }, 30);
+      const capability = await appendCapability({
+        stateDir,
+        itemType: "message",
+        status: "verified_supported",
+      });
+      clearTimeout(releaseTimer);
+      assert.equal(capability.itemType, "message");
+    } finally {
+      Date.now = originalNow;
+      await owner.release();
+    }
+  });
+});
 
 test("CDR-05 Provider Compatibility binds decisions to provider, model, wire, API, endpoint, item schema, and TTL", async () => {
   await withTempState(async (stateDir) => {

@@ -76,6 +76,7 @@ test("Host backend recovers frozen item targets from the stored plan", async () 
     assert.equal(receipt.status, "scheduled");
     assert.deepEqual(receipt.selectedTaskIds, ["task-a"]);
     assert.equal(receipt.estimatedSavedTokens, 50);
+    assert.equal(receipt.fallbackUsed, false);
   } finally {
     await rm(stateDir, { recursive: true, force: true });
   }

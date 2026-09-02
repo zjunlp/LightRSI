@@ -87,6 +87,12 @@ test("packaged Codex codec emits GPT-5.6 cache boundaries without mutating user 
     assert.deepEqual(encoded.input[0].content[0].prompt_cache_breakpoint, { mode: "explicit" });
     assert.equal(encoded.input[1].content, "Keep exact user text.");
     assert.equal("prompt_cache_retention" in encoded, false);
+    await execFileAsync(process.execPath, [
+      resolve(packageDir, "../../..", "scripts", "release", "smoke-host-package.mjs"),
+      archivePath,
+      "codex",
+      manifest.version,
+    ], { timeout: 60_000 });
   } finally {
     if (archivePath) await rm(archivePath, { force: true });
     await rm(extractDir, { recursive: true, force: true });

@@ -83,6 +83,12 @@ test("packaged Claude codec preserves structured systems and native cache contro
     assert.deepEqual(encoded.cache_control, { type: "ephemeral" });
     assert.equal("prompt_cache_key" in encoded, false);
     assert.deepEqual(encoded.messages, raw.messages);
+    await execFileAsync(process.execPath, [
+      resolve(packageDir, "../../..", "scripts", "release", "smoke-host-package.mjs"),
+      archivePath,
+      "claude-code",
+      manifest.version,
+    ], { timeout: 60_000 });
   } finally {
     if (archivePath) await rm(archivePath, { force: true });
     await rm(extractDir, { recursive: true, force: true });

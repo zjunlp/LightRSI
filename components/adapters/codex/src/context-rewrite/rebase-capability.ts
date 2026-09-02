@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, open, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { performance } from "node:perf_hooks";
 import {
   CODEX_REBASE_API_VERSION,
   CODEX_REBASE_CAPABILITY_DEFAULT_TTL_MS,
@@ -218,8 +219,8 @@ async function withCapabilityJournalLock<T>(
   stateDir: string,
   action: () => Promise<T>,
 ): Promise<T> {
-  const deadline = Date.now() + CAPABILITY_JOURNAL_LOCK_TIMEOUT_MS;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + CAPABILITY_JOURNAL_LOCK_TIMEOUT_MS;
+  while (performance.now() < deadline) {
     const lock = await acquireCodexRebaseSessionLock({
       stateDir,
       sessionId: CAPABILITY_JOURNAL_LOCK_SESSION_ID,
@@ -231,7 +232,7 @@ async function withCapabilityJournalLock<T>(
         await lock.release();
       }
     }
-    await wait(Math.min(CAPABILITY_JOURNAL_LOCK_RETRY_MS, Math.max(1, deadline - Date.now())));
+    await wait(Math.min(CAPABILITY_JOURNAL_LOCK_RETRY_MS, Math.max(1, deadline - performance.now())));
   }
   throw new Error("Timed out acquiring Codex provider capability journal lock");
 }

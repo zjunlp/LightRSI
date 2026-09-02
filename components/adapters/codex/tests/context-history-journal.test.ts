@@ -7,6 +7,7 @@ import test from "node:test";
 import { pathToFileURL } from "node:url";
 
 import {
+  acquireCodexContextHistoryJournalLock,
   appendCodexRequestJournalEntry,
   appendCodexResponseJournalEntry,
   buildCodexEffectiveHistory,
@@ -355,6 +356,44 @@ test("CDH-01 serializes concurrent retries inside one request read-modify-append
     assert.equal(journal.entries.length, 1);
     assert.equal(new Set(entries.map((entry) => entry.requestId)).size, 1);
     assert.equal(journal.entries[0]?.kind, "request");
+  });
+});
+
+test("CDH-01 waits for a held journal lock when the wall clock jumps forward", async () => {
+  await withTempState(async (stateDir) => {
+    const sessionId = "codex-session-monotonic-lock";
+    const firstLock = await acquireCodexContextHistoryJournalLock({
+      stateDir,
+      sessionId,
+      timeoutMs: 500,
+      retryMs: 10,
+    });
+    const originalDateNow = Date.now;
+    let dateNowCall = 0;
+    Object.defineProperty(Date, "now", {
+      configurable: true,
+      value: () => {
+        dateNowCall += 1;
+        return dateNowCall === 1 ? 1_000 : 12_000;
+      },
+    });
+
+    try {
+      const waitingLock = acquireCodexContextHistoryJournalLock({
+        stateDir,
+        sessionId,
+        timeoutMs: 500,
+        retryMs: 10,
+      });
+      void waitingLock.catch(() => undefined);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      await firstLock.release();
+      const secondLock = await waitingLock;
+      await secondLock.release();
+    } finally {
+      Object.defineProperty(Date, "now", { configurable: true, value: originalDateNow });
+      await firstLock.release();
+    }
   });
 });
 

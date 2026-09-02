@@ -46,14 +46,16 @@ node /path/to/package/dist/install-codex.js
 
 The release archive is self-contained: its hooks, recovery MCP server, `lightrsi` command, and `tokenpilot-codex` command all run from the extracted package directory. Keep that directory in place after installation.
 
-For a source checkout, build the adapter first:
-
-Build the adapter:
+For a source checkout, use the one-pass Cleaner installation flow:
 
 ```bash
 cd /path/to/LightRSI
-npm --prefix components/adapters/codex run build
+corepack pnpm cleaner:install:codex
 ```
+
+Use `--skip-build` only for a verified existing build. The source installer
+rejects missing or stale CLI, MCP, and adapter artifacts before it changes
+Codex configuration.
 
 If your Codex files are not under the default `~/.codex`, set:
 
@@ -63,11 +65,11 @@ export CODEX_HOOKS_CONFIG_PATH="/path/to/hooks.json"
 export TOKENPILOT_CODEX_CONFIG="/path/to/tokenpilot.json"
 ```
 
-Then install:
+Then run the same one-pass installer:
 
 ```bash
 cd /path/to/LightRSI
-npm --prefix components/adapters/codex run install:codex
+corepack pnpm cleaner:install:codex
 ```
 
 If `lightrsi` is not found after install, make sure `~/.local/bin` is on your `PATH`.
@@ -82,7 +84,7 @@ The installer will:
  - write TokenPilot runtime config
  - start the local TokenPilot proxy immediately
  - register TokenPilot hooks for `SessionStart`, `PreToolUse`, and `PostToolUse`
- - install read-only Codex skill bridge entries under the local Codex skills directory
+- install constrained Codex command skills under the local Codex skills directory
 - run a post-install MCP startup probe and report degraded mode if recovery MCP is still unavailable
 
 The installed Codex skill bridge currently creates these explicit skills:
@@ -91,8 +93,13 @@ The installed Codex skill bridge currently creates these explicit skills:
 - `lightrsi-report`
 - `lightrsi-doctor`
 - `lightrsi-visual`
+- `lightrsi-clean` (explicit, analysis-only; it never selects or confirms a clean)
 
 These are host entry points, not a separate runtime implementation. They call the existing `lightrsi codex ...` CLI surface underneath.
+
+On Windows the installer also creates `lightrsi.cmd` and
+`tokenpilot-codex.cmd`. If the npm command directory is already on `PATH`, these
+commands are available immediately in a new CMD or PowerShell terminal.
 
 This install mode is intentionally session-preserving: Codex keeps using the same provider name it was already using, so existing thread history does not disappear behind a separate `tokenpilot` provider bucket.
 

@@ -10,6 +10,15 @@ import {
 } from "../src/install.js";
 import { proxyBaseUrlForPort } from "../src/config.js";
 
+async function assertInstalledCliLink(linkPath: string, targetPattern: RegExp, allowRegularFile: boolean) {
+  const linkStat = await lstat(linkPath);
+  if (linkStat.isSymbolicLink()) {
+    assert.match(await readlink(linkPath), targetPattern);
+    return;
+  }
+  assert.equal(allowRegularFile && linkStat.isFile(), true);
+}
+
 function installClaudeCodeTokenPilot(
   params: NonNullable<Parameters<typeof installClaudeCodeTokenPilotBase>[0]>,
 ) {
@@ -22,6 +31,7 @@ function installClaudeCodeTokenPilot(
   );
   return installClaudeCodeTokenPilotBase({
     ...params,
+    cliBinDir: params.cliBinDir ?? join(testRoot, "bin"),
     cliContextPath: params.cliContextPath ?? join(testRoot, ".lightrsi", "state", "cli-context.json"),
   });
 }
@@ -36,11 +46,17 @@ test("installClaudeCodeTokenPilot writes settings, MCP config, and backups exist
     const tokenPilotConfigPath = join(dir, "tokenpilot.json");
     const cliBinDir = join(dir, "bin");
     const legacySkillDir = join(dir, "skills", "lightmem2-doctor");
+    const legacyCleanerSkillDir = join(dir, "skills", "lightmem2-clean");
+    const userSkillDir = join(dir, "skills", "personal-clean");
 
     await writeFile(settingsPath, `${JSON.stringify({ env: { KEEP_ME: "1" } }, null, 2)}\n`, "utf8");
     await writeFile(mcpConfigPath, `${JSON.stringify({ mcpServers: { existing: { command: "node" } } }, null, 2)}\n`, "utf8");
     await mkdir(legacySkillDir, { recursive: true });
     await writeFile(join(legacySkillDir, "SKILL.md"), "legacy", "utf8");
+    await mkdir(legacyCleanerSkillDir, { recursive: true });
+    await writeFile(join(legacyCleanerSkillDir, "SKILL.md"), "legacy cleaner", "utf8");
+    await mkdir(userSkillDir, { recursive: true });
+    await writeFile(join(userSkillDir, "SKILL.md"), "user-owned", "utf8");
 
     const result = await installClaudeCodeTokenPilot({
       settingsPath,
@@ -85,16 +101,18 @@ test("installClaudeCodeTokenPilot writes settings, MCP config, and backups exist
       "lightrsi-report",
       "lightrsi-doctor",
       "lightrsi-visual",
+      "lightrsi-clean",
     ]);
     assert.equal(result.cliBinInstalled, true);
     assert.equal(result.cliBinPath, join(cliBinDir, "lightrsi"));
     assert.equal(result.cliBinDir, cliBinDir);
     assert.equal(result.cliBinDirOnPath, false);
     assert.equal(result.hostCliBinPath, join(cliBinDir, "tokenpilot-claude-code"));
-    assert.equal((await lstat(result.cliBinPath)).isSymbolicLink(), true);
-    assert.match(await readlink(result.cliBinPath), /products[\/\\]cli[\/\\]dist[\/\\]cli\.js$/);
-    assert.equal((await lstat(result.hostCliBinPath!)).isSymbolicLink(), true);
-    assert.match(await readlink(result.hostCliBinPath!), /adapters[\/\\]claude-code[\/\\]dist[\/\\]cli\.js$/);
+    assert.equal(result.cliLauncherPath, process.platform === "win32" ? join(cliBinDir, "lightrsi.cmd") : undefined);
+    assert.equal(result.hostCliLauncherPath, process.platform === "win32" ? join(cliBinDir, "tokenpilot-claude-code.cmd") : undefined);
+    const allowRegularFile = process.platform === "win32";
+    await assertInstalledCliLink(result.cliBinPath, /products[\/\\]cli[\/\\]dist[\/\\]cli\.js$/, allowRegularFile);
+    await assertInstalledCliLink(result.hostCliBinPath!, /adapters[\/\\]claude-code[\/\\]dist[\/\\]cli\.js$/, allowRegularFile);
     assert.match(result.expectedHookCommand, /hooks-handler\.(js|ts)/);
     assert.ok(result.expectedMcpArgs.length > 0);
     assert.equal(result.expectedMcpStartupTimeoutSec, 90);
@@ -108,7 +126,16 @@ test("installClaudeCodeTokenPilot writes settings, MCP config, and backups exist
     const skillRaw = await readFile(join(result.commandSkillsDir, "lightrsi-doctor", "SKILL.md"), "utf8");
     assert.match(skillRaw, /lightrsi claude-code doctor/);
     assert.match(skillRaw, /disable-model-invocation:\s*true/);
+    const cleanSkillRaw = await readFile(join(result.commandSkillsDir, "lightrsi-clean", "SKILL.md"), "utf8");
+    assert.match(cleanSkillRaw, /^   lightrsi claude-code clean$/m);
+    assert.doesNotMatch(cleanSkillRaw, /^   lightrsi claude-code clean\s+--/m);
+    assert.match(cleanSkillRaw, /Never choose task IDs, item IDs, item digests, or deletion ranges/);
+    assert.match(cleanSkillRaw, /Never add `--plan`, `--select`, `--status`, or `--cancel`/);
+    assert.match(cleanSkillRaw, /Never answer the confirmation prompt/);
+    assert.match(cleanSkillRaw, /disable-model-invocation:\s*true/);
     await assert.rejects(stat(legacySkillDir), { code: "ENOENT" });
+    await assert.rejects(stat(legacyCleanerSkillDir), { code: "ENOENT" });
+    assert.equal(await readFile(join(userSkillDir, "SKILL.md"), "utf8"), "user-owned");
   } finally {
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
