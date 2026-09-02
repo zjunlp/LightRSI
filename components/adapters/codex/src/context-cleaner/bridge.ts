@@ -71,8 +71,7 @@ function validReceiptState(receipt: ContextCleanReceipt): boolean {
     || Object.prototype.hasOwnProperty.call(record, "appliedSavedChars")) {
     return false;
   }
-  return !["analyzed", "approved", "scheduled"].includes(receipt.status)
-    || receipt.fallbackUsed === false;
+  return true;
 }
 
 function validateApprovedRequest(request: ExecuteApprovedContextCleanParams): string[] {

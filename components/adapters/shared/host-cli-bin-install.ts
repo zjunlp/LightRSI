@@ -1,6 +1,7 @@
-import { chmod, link, mkdir, symlink, unlink } from "node:fs/promises";
+import { chmod, copyFile, mkdir, symlink, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { CliHostId } from "../../products/cli/src/hosts/registry.js";
+import { installWindowsNodeCommandLauncher } from "./windows-command-launcher.js";
 
 function hostCliDistPathFromAdapterRoot(adapterRoot: string): string {
   return resolve(adapterRoot, "dist", "cli.js");
@@ -20,7 +21,7 @@ async function createCliLink(targetPath: string, binPath: string): Promise<void>
     if (process.platform !== "win32" || !["EACCES", "EPERM", "UNKNOWN"].includes(code ?? "")) {
       throw error;
     }
-    await link(targetPath, binPath);
+    await copyFile(targetPath, binPath);
   }
 }
 
@@ -28,9 +29,12 @@ export async function installHostCliBin(params: {
   adapterRoot: string;
   host: "codex" | "claude-code";
   binDir: string;
+  platform?: NodeJS.Platform;
+  nodePath?: string;
 }): Promise<{
   installed: boolean;
   binPath: string;
+  launcherPath?: string;
   binName: string;
   cliDistPath: string;
 }> {
@@ -43,10 +47,17 @@ export async function installHostCliBin(params: {
   await unlink(binPath).catch(() => undefined);
   await createCliLink(cliDistPath, binPath);
   await chmod(binPath, 0o755).catch(() => undefined);
+  const launcherPath = await installWindowsNodeCommandLauncher({
+    binPath,
+    targetPath: cliDistPath,
+    platform: params.platform,
+    nodePath: params.nodePath,
+  });
 
   return {
     installed: true,
     binPath,
+    launcherPath,
     binName,
     cliDistPath,
   };

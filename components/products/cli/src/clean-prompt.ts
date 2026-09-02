@@ -1,26 +1,37 @@
 import { emitKeypressEvents } from "node:readline";
 
-import { estimateCleanSelection, type CleanPlanView } from "./clean-renderer.js";
+import { estimateCleanSelection, renderCleanPlan, type CleanPlanView } from "./clean-renderer.js";
 
 export type CleanTaskPrompt = (plan: CleanPlanView) => Promise<string[] | undefined>;
 
+export function createInitialCleanPromptState(plan: CleanPlanView): {
+  selectedTaskIds: string[];
+  text: string;
+} {
+  return {
+    selectedTaskIds: [],
+    text: renderCleanPlan(plan),
+  };
+}
+
 export async function promptForCleanTasks(plan: CleanPlanView): Promise<string[] | undefined> {
   const choices = plan.tasks.filter((task) => task.selectable);
-  if (choices.length === 0) return [];
   if (!process.stdin.isTTY || !process.stdout.isTTY) return undefined;
 
-  const selected = new Set(
-    choices.filter((task) => task.recommendation === "clean").map((task) => task.taskId),
-  );
+  const initial = createInitialCleanPromptState(plan);
+  process.stdout.write(`${initial.text}\n\n`);
+  if (choices.length === 0) return [];
+
+  const selected = new Set(initial.selectedTaskIds);
   let cursor = 0;
   emitKeypressEvents(process.stdin);
   const render = (first: boolean) => {
     if (!first) process.stdout.write(`\u001b[${choices.length + 2}A`);
-    process.stdout.write("Select tasks to clean (↑/↓ move, space toggle, enter confirm, q cancel)\n");
+    process.stdout.write("Select tasks to clean (up/down move, space toggle, enter confirm, q cancel)\n");
     for (const [index, task] of choices.entries()) {
       const marker = index === cursor ? ">" : " ";
       const checked = selected.has(task.taskId) ? "x" : " ";
-      process.stdout.write(`${marker} [${checked}] ${task.taskId} — ${task.label}\u001b[K\n`);
+      process.stdout.write(`${marker} [${checked}] ${task.taskId} - ${task.label}\u001b[K\n`);
     }
     const estimate = estimateCleanSelection(plan, [...selected]);
     const estimateText = estimate.tokens === null ? `${estimate.chars} chars` : `${estimate.tokens} tok`;

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, open, readFile, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
 
 import {
@@ -56,7 +57,7 @@ export async function withContextCleanStoreLock<T>(params: {
 }): Promise<T> {
   const path = contextCleanLockFilePath(params.stateDir, params.planId);
   const token = `${process.pid}:${Date.now()}:${Math.random()}`;
-  const startedAt = Date.now();
+  const startedAt = performance.now();
   await mkdir(dirname(path), { recursive: true });
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   while (!handle) {
@@ -71,7 +72,7 @@ export async function withContextCleanStoreLock<T>(params: {
       } catch (statError) {
         if ((statError as NodeJS.ErrnoException).code !== "ENOENT") throw statError;
       }
-      if (Date.now() - startedAt >= LOCK_TIMEOUT_MS) throw new Error("clean_store_lock_timeout");
+      if (performance.now() - startedAt >= LOCK_TIMEOUT_MS) throw new Error("clean_store_lock_timeout");
       await delay(LOCK_RETRY_MS);
     }
   }

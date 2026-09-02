@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, open, readFile, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { appendJsonl } from "@lightrsi/host-adapter";
@@ -173,7 +174,7 @@ export async function acquireClaudeCleanerScheduleLock(params: {
 }): Promise<{ release(): Promise<void> } | undefined> {
   const path = scheduleLockPath(params.stateDir, params.sessionId);
   const token = `${process.pid}:${Date.now()}:${Math.random()}`;
-  const startedAt = Date.now();
+  const startedAt = performance.now();
   await mkdir(scheduleSessionDir(params.stateDir, params.sessionId), { recursive: true });
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   while (!handle) {
@@ -188,7 +189,7 @@ export async function acquireClaudeCleanerScheduleLock(params: {
       } catch (statError) {
         if ((statError as NodeJS.ErrnoException).code !== "ENOENT") return undefined;
       }
-      if (Date.now() - startedAt >= LOCK_TIMEOUT_MS) return undefined;
+      if (performance.now() - startedAt >= LOCK_TIMEOUT_MS) return undefined;
       await delay(LOCK_RETRY_MS);
     }
   }

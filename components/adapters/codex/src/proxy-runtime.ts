@@ -47,6 +47,7 @@ import { prepareCodexStablePrefix } from "./stable-prefix.js";
 import {
   requestUpstreamResponses,
   requestUpstreamResponsesStream,
+  resolveCodexRequestUpstream,
 } from "./upstream.js";
 import {
   appendCodexRecentTurnBinding,
@@ -642,8 +643,13 @@ export async function startCodexResponsesProxy(params: {
       try {
         const body = await readBody(controller.signal);
         const bodyReceivedAt = performance.now();
-        await forwardPureProviderWire({
+        const requestUpstream = resolveCodexRequestUpstream({
           upstream,
+          upstreamProvider: config.upstreamProvider,
+          inboundHeaders: req.headers,
+        });
+        await forwardPureProviderWire({
+          upstream: requestUpstream,
           req,
           res,
           pathname,
@@ -662,6 +668,11 @@ export async function startCodexResponsesProxy(params: {
       return true;
     },
     async handleRequest({ req, res, body }) {
+      const requestUpstream = resolveCodexRequestUpstream({
+        upstream,
+        upstreamProvider: config.upstreamProvider,
+        inboundHeaders: req.headers,
+      });
       const inboundPayload = JSON.parse(body) as JsonObject;
       normalizeResponsesInputForUpstream(inboundPayload?.input);
       const inboundPromptCacheKey =
@@ -1315,9 +1326,10 @@ export async function startCodexResponsesProxy(params: {
 
       const authorization = typeof req.headers.authorization === "string" ? req.headers.authorization : undefined;
       const sendUpstream = (nextPayload: JsonObject) => requestUpstreamResponses({
-        upstream,
+        upstream: requestUpstream,
         payload: nextPayload,
         inboundAuthorization: authorization,
+        inboundHeaders: req.headers,
         stateDir: config.stateDir,
       });
       const acceptedEvidence: CodexRebaseCapabilityEvidence[] = params.allowMockFixtureEvidence
@@ -1329,7 +1341,7 @@ export async function startCodexResponsesProxy(params: {
         model,
         wireMode: CODEX_REBASE_WIRE_MODE,
         apiVersion: CODEX_REBASE_API_VERSION,
-        endpointId: codexRebaseEndpointIdentity(upstream.baseUrl),
+        endpointId: codexRebaseEndpointIdentity(requestUpstream.baseUrl),
         itemSchemaVersion: CODEX_REBASE_ITEM_SCHEMA_VERSION,
         probeMode: config.contextRewrite.providerCompatibilityProbe,
         acceptedEvidence,
@@ -1862,9 +1874,10 @@ export async function startCodexResponsesProxy(params: {
           return;
         }
         const upstreamResp = await requestUpstreamResponsesStream({
-          upstream,
+          upstream: requestUpstream,
           payload,
           inboundAuthorization: authorization,
+          inboundHeaders: req.headers,
           stateDir: config.stateDir,
         });
         res.statusCode = upstreamResp.status;

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname } from "node:path";
+import { performance } from "node:perf_hooks";
 import { TextDecoder } from "node:util";
 
 import {
@@ -263,7 +264,7 @@ export async function acquireCodexContextHistoryJournalLock(params: {
   const staleAfterMs = Math.max(1_000, params.staleAfterMs ?? DEFAULT_LOCK_STALE_MS);
   const timeoutMs = Math.max(0, params.timeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS);
   const retryMs = Math.max(1, params.retryMs ?? DEFAULT_LOCK_RETRY_MS);
-  const deadline = Date.now() + timeoutMs;
+  const deadline = performance.now() + timeoutMs;
 
   do {
     const lock = await tryAcquireJournalLock({
@@ -272,8 +273,8 @@ export async function acquireCodexContextHistoryJournalLock(params: {
       staleAfterMs,
     });
     if (lock) return lock;
-    if (Date.now() >= deadline) break;
-    await wait(Math.min(retryMs, Math.max(1, deadline - Date.now())));
+    if (performance.now() >= deadline) break;
+    await wait(Math.min(retryMs, Math.max(1, deadline - performance.now())));
   } while (true);
 
   throw new Error(`Timed out acquiring Codex context-history journal lock for session ${params.sessionId}`);

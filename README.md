@@ -63,10 +63,11 @@ git clone https://github.com/zjunlp/LightRSI.git
 cd LightRSI
 corepack enable
 pnpm install
-pnpm build
-pnpm lightrsi:build
-pnpm lightrsi:install
 ```
+
+The Host-specific Cleaner installer below builds the shared CLI, recovery MCP,
+and selected adapter before installing them. A separate repository-wide build is
+not required for this flow.
 
 ### 2. Pick Your Host
 
@@ -108,11 +109,13 @@ pnpm component:install:tokenpilot:openclaw
 Default install:
 
 ```bash
-npm --prefix components/adapters/codex run build
-npm --prefix components/adapters/codex run install:codex
+corepack pnpm cleaner:install:codex
 ```
 
-This keeps your current active Codex provider name, reroutes that provider through the local TokenPilot proxy, writes `~/.codex/tokenpilot.json`, registers hooks in `~/.codex/hooks.json`, registers the shared `tokenpilot_memory_fault_recover` MCP server, and creates the standalone `lightrsi` CLI entrypoint at `~/.local/bin/lightrsi`.
+This builds and installs the shared CLI, recovery MCP, Codex adapter, and
+restricted `lightrsi-clean` command skill. It keeps your current active Codex
+provider, reroutes it through the local TokenPilot proxy, writes
+`~/.codex/tokenpilot.json`, and registers the required hooks and MCP server.
 
 If your Codex config files are not under the default `~/.codex`, set:
 
@@ -125,11 +128,13 @@ export TOKENPILOT_CODEX_CONFIG="/path/to/tokenpilot.json"
 Then run the same install flow:
 
 ```bash
-npm --prefix components/adapters/codex run build
-npm --prefix components/adapters/codex run install:codex
+corepack pnpm cleaner:install:codex
 ```
 
-If `lightrsi` is not found after install, make sure `~/.local/bin` is on your `PATH`.
+On Windows, the installer uses the npm command directory when that directory is
+already on `PATH` and creates `lightrsi.cmd`. On Linux/macOS it installs under
+`~/.local/bin` by default. Set `LIGHTRSI_BIN_DIR` to choose another command
+directory.
 
 </details>
 
@@ -141,11 +146,13 @@ If `lightrsi` is not found after install, make sure `~/.local/bin` is on your `P
 Default install:
 
 ```bash
-npm --prefix components/adapters/claude-code run build
-npm --prefix components/adapters/claude-code run install:claude-code
+corepack pnpm cleaner:install:claude-code
 ```
 
-This updates `~/.claude/settings.json` for local gateway routing, writes `~/.claude/tokenpilot.json`, registers the shared `tokenpilot_memory_fault_recover` MCP server in `~/.claude/.claude.json`, installs a `SessionStart` hook that auto-starts the local gateway on first use, and preserves existing Claude files as `.tokenpilot.bak` backups before rewriting.
+This builds and installs the shared CLI, recovery MCP, Claude Code adapter, and
+restricted `lightrsi-clean` command skill. It updates local gateway routing,
+registers the required hooks and MCP server, and preserves existing Claude files
+as `.tokenpilot.bak` backups before rewriting.
 
 If your Claude Code files are not under the default `~/.claude`, set:
 
@@ -158,11 +165,14 @@ export TOKENPILOT_CLAUDE_CODE_CONFIG="/path/to/tokenpilot.json"
 Then run the same install flow:
 
 ```bash
-npm --prefix components/adapters/claude-code run build
-npm --prefix components/adapters/claude-code run install:claude-code
+corepack pnpm cleaner:install:claude-code
 ```
 
-If `lightrsi` is not found after install, make sure `~/.local/bin` is on your `PATH`.
+Use `node scripts/install-cleaner.mjs <host> --dry-run` to inspect the exact build
+and installation commands without changing Host configuration.
+Add `--skip-build` only when reusing an existing local build; the installer
+rejects missing or older CLI, MCP, and adapter artifacts before changing Host
+configuration.
 
 </details>
 

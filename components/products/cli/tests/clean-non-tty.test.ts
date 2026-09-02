@@ -23,6 +23,8 @@ test("non-interactive clean is analysis-only and never calls approve", async () 
   const result = await handleCleanCommand({ args: [], sessionId: "session-1", backend, interactive: false });
   assert.equal(approved, false);
   assert.match(result.text, /Analysis only \(non-interactive\)/);
+  assert.match(result.text, /1\. task-a - Finished/);
+  assert.match(result.text, /None selected by default/);
   assert.match(result.text, /--plan plan-non-tty --select/);
   assert.match(result.text, /Recommended selection estimate: 300 chars/);
 });

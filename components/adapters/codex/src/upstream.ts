@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { readJsonFile, writeJsonFileAtomic } from "@lightrsi/host-adapter";
+import {
+  buildGatewayForwardHeaders,
+  readJsonFile,
+  writeJsonFileAtomic,
+} from "@lightrsi/host-adapter";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { collectCodexResponseItemsFromStream } from "./context-history/sse-item-collector.js";
@@ -18,6 +22,26 @@ export type UpstreamStreamResponse = {
 };
 
 type OptionalResponsesField = "prompt_cache_options" | "prompt_cache_retention" | "prompt_cache_key";
+
+type InboundHeaders = Record<string, string | string[] | undefined>;
+
+export const CODEX_CHATGPT_UPSTREAM_BASE_URL = "https://chatgpt.com/backend-api/codex";
+
+export function resolveCodexRequestUpstream(params: {
+  upstream: CodexProviderConfig;
+  upstreamProvider?: string;
+  inboundHeaders?: InboundHeaders;
+}): CodexProviderConfig {
+  const isBuiltInOpenAI = params.upstreamProvider?.trim().toLowerCase() === "openai";
+  const usesChatGptAccount = Object.keys(params.inboundHeaders ?? {}).some(
+    (name) => name.toLowerCase() === "chatgpt-account-id",
+  );
+  if (!isBuiltInOpenAI || !usesChatGptAccount) return params.upstream;
+  return {
+    ...params.upstream,
+    baseUrl: CODEX_CHATGPT_UPSTREAM_BASE_URL,
+  };
+}
 
 type UpstreamResponsesCapabilityRecord = {
   endpoint: string;
@@ -46,11 +70,23 @@ function headersFrom(resp: Response): Record<string, string> {
   return Object.fromEntries(resp.headers.entries());
 }
 
-function requestHeaders(upstream: CodexProviderConfig, inboundAuthorization?: string): Record<string, string> {
-  return {
-    "content-type": "application/json",
-    authorization: `Bearer ${upstreamApiKey(upstream, inboundAuthorization)}`,
-  };
+function requestHeaders(
+  upstream: CodexProviderConfig,
+  inboundAuthorization?: string,
+  inboundHeaders?: InboundHeaders,
+): Record<string, string> {
+  const apiKey = upstreamApiKey(upstream, inboundAuthorization);
+  return buildGatewayForwardHeaders({
+    upstream: {
+      baseUrl: upstream.baseUrl,
+      ...(apiKey ? { apiKey } : {}),
+      name: upstream.name,
+      protocol: "custom",
+    },
+    inboundAuthorization,
+    inboundHeaders,
+    includeJsonContentType: true,
+  });
 }
 function clonePayloadWithoutOptionalField(payload: any, field: OptionalResponsesField): any {
   if (!payload || typeof payload !== "object") return payload;
@@ -161,11 +197,12 @@ export async function requestUpstreamResponses(params: {
   upstream: CodexProviderConfig;
   payload: any;
   inboundAuthorization?: string;
+  inboundHeaders?: InboundHeaders;
   stateDir?: string;
 }): Promise<UpstreamHttpResponse> {
   const send = (payload: any) => fetch(endpointFor(params.upstream), {
     method: "POST",
-    headers: requestHeaders(params.upstream, params.inboundAuthorization),
+    headers: requestHeaders(params.upstream, params.inboundAuthorization, params.inboundHeaders),
     body: JSON.stringify(payload),
   });
   const unsupportedFields = await loadUnsupportedOptionalFields(params.stateDir, params.upstream);
@@ -203,11 +240,12 @@ export async function requestUpstreamResponsesStream(params: {
   upstream: CodexProviderConfig;
   payload: any;
   inboundAuthorization?: string;
+  inboundHeaders?: InboundHeaders;
   stateDir?: string;
 }): Promise<UpstreamStreamResponse> {
   const send = (payload: any) => fetch(endpointFor(params.upstream), {
     method: "POST",
-    headers: requestHeaders(params.upstream, params.inboundAuthorization),
+    headers: requestHeaders(params.upstream, params.inboundAuthorization, params.inboundHeaders),
     body: JSON.stringify(payload),
   });
   const unsupportedFields = await loadUnsupportedOptionalFields(params.stateDir, params.upstream);

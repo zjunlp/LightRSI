@@ -34,6 +34,7 @@ export type CleanReceiptView = {
   estimatedSavedChars: number;
   appliedSavedTokens?: number | null;
   appliedSavedChars?: number;
+  fallbackUsed: boolean;
   deferredTaskIds: string[];
   reasons: string[];
 };
@@ -43,7 +44,9 @@ function count(tokens: number | null, chars: number): string {
 }
 
 function cell(value: string, width: number): string {
-  return value.length > width ? `${value.slice(0, Math.max(0, width - 1))}…` : value.padEnd(width);
+  return value.length > width
+    ? `${value.slice(0, Math.max(0, width - 3))}...`
+    : value.padEnd(width);
 }
 
 function risk(task: CleanTaskView): string {
@@ -80,11 +83,11 @@ export function renderCleanPlan(plan: CleanPlanView): string {
   const widths = [
     3,
     Math.max(18, "TASK".length, ...plan.tasks.map((task) => task.taskId.length)),
-    32,
-    12,
-    7,
+    22,
     10,
-    34,
+    7,
+    9,
+    17,
   ];
   const format = (row: string[]) => row.map((value, index) => cell(value, widths[index]!)).join("  ").trimEnd();
   const recommendedTaskIds = plan.tasks
@@ -104,9 +107,14 @@ export function renderCleanPlan(plan: CleanPlanView): string {
     format(["", "TASK", "DESCRIPTION", "SIZE", "SHARE", "ADVICE", "RISK / REASONS"]),
     format(widths.map((width) => "-".repeat(width))),
     ...rows.map(format),
+    "",
+    "Task details:",
+    ...plan.tasks.map((task) => `- ${task.taskId}: ${task.description}`),
+    "",
+    "Reason codes:",
     ...plan.tasks
       .filter((task) => task.reasonCodes.length > 0)
-      .map((task) => `Reasons ${task.taskId}: ${task.reasonCodes.join(", ")}`),
+      .map((task) => `- ${task.taskId}: ${task.reasonCodes.join(", ")}`),
     "",
     `Recommended selection estimate: ${count(recommended.tokens, recommended.chars)}`,
   ].join("\n");
@@ -117,10 +125,20 @@ export function renderCleanReceipt(receipt: CleanReceiptView): string {
     `Context clean ${receipt.status}: ${receipt.planId}`,
     `Selected tasks: ${receipt.selectedTaskIds.length > 0 ? receipt.selectedTaskIds.join(", ") : "(none)"}`,
     `Estimated savings: ${count(receipt.estimatedSavedTokens, receipt.estimatedSavedChars)}`,
+    `Scheduled savings: ${receipt.status === "scheduled" || receipt.status === "applied"
+      ? count(receipt.estimatedSavedTokens, receipt.estimatedSavedChars)
+      : "not scheduled"}`,
   ];
-  if (receipt.appliedSavedTokens !== undefined || receipt.appliedSavedChars !== undefined) {
-    lines.push(`Released: ${count(receipt.appliedSavedTokens ?? null, receipt.appliedSavedChars ?? 0)}`);
+  if (receipt.status === "applied") {
+    if (receipt.appliedSavedTokens !== undefined || receipt.appliedSavedChars !== undefined) {
+      lines.push(`Applied savings: ${count(receipt.appliedSavedTokens ?? null, receipt.appliedSavedChars ?? 0)}`);
+    } else {
+      lines.push("Applied savings: unavailable (missing Host evidence)");
+    }
+  } else {
+    lines.push("Applied savings: not applied");
   }
+  lines.push(`Fallback count: ${receipt.fallbackUsed ? 1 : 0}`);
   if (receipt.status === "scheduled") lines.push("Apply timing: next Host request.");
   if (receipt.deferredTaskIds.length > 0) lines.push(`Deferred tasks: ${receipt.deferredTaskIds.join(", ")}`);
   if (receipt.reasons.length > 0) lines.push(`Reasons: ${receipt.reasons.join(", ")}`);

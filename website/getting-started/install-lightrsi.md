@@ -44,7 +44,12 @@ pnpm lightrsi:build
 pnpm lightrsi:install
 ```
 
-The first command builds the shared `lightrsi` CLI. The second installs it to `~/.local/bin/lightrsi`.
+The first command builds the shared `lightrsi` CLI. The second installs it to
+`~/.local/bin/lightrsi` on Linux/macOS. For the complete Codex or Claude Code
+Cleaner flow, use `pnpm cleaner:install:codex` or
+`pnpm cleaner:install:claude-code`; those commands also build the recovery MCP,
+selected adapter, and `lightrsi-clean` command skill. On Windows they create a
+`lightrsi.cmd` launcher.
 
 ::: warning PATH notice Make sure `~/.local/bin` is on your `PATH`. Add this to your shell config if needed:
 

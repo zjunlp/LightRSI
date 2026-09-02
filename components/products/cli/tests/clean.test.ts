@@ -28,7 +28,7 @@ function plan(): CleanPlanView {
 
 function receipt(status = "scheduled", selectedTaskIds = ["task-a"]): CleanReceiptView {
   return { planId: "plan-1", status, selectedTaskIds, estimatedSavedTokens: 60,
-    estimatedSavedChars: 240, deferredTaskIds: [], reasons: [] };
+    estimatedSavedChars: 240, fallbackUsed: false, deferredTaskIds: [], reasons: [] };
 }
 
 function backend(calls: string[]): CleanCommandBackend {
@@ -63,6 +63,24 @@ test("explicit plan selection supports scripts and rejects protected tasks", asy
       args: ["--plan", "plan-1", "--select", "task-current"], backend: backend([]), interactive: false,
     }),
     /clean_selection_task_protected:task-current/,
+  );
+});
+
+test("clean accepts only the documented command forms", async () => {
+  await assert.rejects(
+    handleCleanCommand({
+      args: ["--session", "session-1", "--plan", "plan-1", "--select", "task-a"],
+      backend: backend([]),
+    }),
+    /clean_argument_syntax/,
+  );
+  await assert.rejects(
+    handleCleanCommand({ args: ["--status", "--plan", "plan-1"], backend: backend([]) }),
+    /clean_argument_syntax/,
+  );
+  await assert.rejects(
+    handleCleanCommand({ args: ["--cancel", "plan-1", "--session", "session-1"], backend: backend([]) }),
+    /clean_argument_syntax/,
   );
 });
 

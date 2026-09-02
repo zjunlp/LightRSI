@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readlink, rm } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, readlink, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -24,6 +24,16 @@ const tarCommand = process.platform === "win32"
   : "tar";
 const extractDir = await mkdtemp(join(tmpdir(), `lightrsi-${host}-release-smoke-`));
 
+async function assertInstalledBin(binPath, targetPath) {
+  const entry = await lstat(binPath);
+  if (entry.isSymbolicLink()) {
+    assert.equal(await readlink(binPath), targetPath);
+    return;
+  }
+  assert.equal(entry.isFile(), true);
+  assert.deepEqual(await readFile(binPath), await readFile(targetPath));
+}
+
 try {
   await execFileAsync(tarCommand, ["-xzf", archivePath, "-C", extractDir]);
   const packageDir = join(extractDir, "package");
@@ -43,6 +53,8 @@ try {
   const env = {
     ...process.env,
     HOME: homeDir,
+    USERPROFILE: homeDir,
+    LIGHTRSI_BIN_DIR: binDir,
     PATH: `${binDir}:${process.env.PATH ?? ""}`,
   };
   let hostConfigPath;
@@ -77,13 +89,22 @@ try {
   assert.match(installedConfig, new RegExp(`${normalizedDistDir}/${hookEntry}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(installedConfig, new RegExp(`${normalizedDistDir}/mcp-server.js`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
-  assert.equal(await readlink(join(binDir, "lightrsi")), join(distDir, "lightrsi.js"));
-  assert.equal(await readlink(join(binDir, "lightmem2")), join(distDir, "lightrsi.js"));
-  assert.equal(await readlink(join(binDir, hostCliName)), join(distDir, "cli.js"));
+  await assertInstalledBin(join(binDir, "lightrsi"), join(distDir, "lightrsi.js"));
+  await assertInstalledBin(join(binDir, "lightmem2"), join(distDir, "lightrsi.js"));
+  await assertInstalledBin(join(binDir, hostCliName), join(distDir, "cli.js"));
+  if (process.platform === "win32") {
+    assert.match(await readFile(join(binDir, "lightrsi.cmd"), "utf8"), /lightrsi\.js" %\*/);
+    assert.match(await readFile(join(binDir, `${hostCliName}.cmd`), "utf8"), /cli\.js" %\*/);
+  }
 
   const skillsRoot = host === "codex" ? join(homeDir, ".codex", "skills") : join(homeDir, ".claude", "skills");
   const skill = (await readFile(join(skillsRoot, "lightrsi-doctor", "SKILL.md"), "utf8")).replace(/\\+/g, "/");
   assert.match(skill, new RegExp(`${normalizedDistDir}/lightrsi.js`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  const cleanerSkill = (await readFile(join(skillsRoot, "lightrsi-clean", "SKILL.md"), "utf8")).replace(/\\+/g, "/");
+  assert.match(cleanerSkill, new RegExp(`^   lightrsi ${host} clean$`, "m"));
+  assert.doesNotMatch(cleanerSkill, new RegExp(`^   lightrsi ${host} clean\\s+--`, "m"));
+  assert.match(cleanerSkill, /Never choose task IDs, item IDs, item digests, or deletion ranges/);
+  assert.match(cleanerSkill, /Never answer the confirmation prompt or run a follow-up command/);
 
   const loaded = await import(pathToFileURL(join(distDir, "index.js")).href);
   assert.ok(Object.keys(loaded).length > 0);

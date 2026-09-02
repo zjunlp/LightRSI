@@ -10,6 +10,7 @@ import {
 } from "node:fs/promises";
 import { hostname } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { writeJsonFileAtomic } from "../state/file-store.js";
@@ -340,13 +341,13 @@ async function acquireSessionLock(params: {
   const timeoutMs = Math.max(0, params.options?.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS);
   const retryMs = Math.max(1, params.options?.lockRetryMs ?? DEFAULT_LOCK_RETRY_MS);
   const staleAfterMs = Math.max(1_000, params.options?.lockStaleMs ?? DEFAULT_LOCK_STALE_MS);
-  const deadline = Date.now() + timeoutMs;
+  const deadline = performance.now() + timeoutMs;
   await mkdir(dirname(lockPath), { recursive: true });
 
   while (true) {
     try {
       await stat(recoveryPath);
-      if (Date.now() >= deadline) return undefined;
+      if (performance.now() >= deadline) return undefined;
       await delay(retryMs);
       continue;
     } catch (error) {
@@ -361,7 +362,7 @@ async function acquireSessionLock(params: {
           await mkdir(recoveryPath);
         } catch (recoveryError) {
           if (errorCode(recoveryError) !== "EEXIST") throw recoveryError;
-          if (Date.now() >= deadline) return undefined;
+          if (performance.now() >= deadline) return undefined;
           await delay(retryMs);
           continue;
         }
@@ -378,7 +379,7 @@ async function acquireSessionLock(params: {
         }
         continue;
       }
-      if (Date.now() >= deadline) return undefined;
+      if (performance.now() >= deadline) return undefined;
       await delay(retryMs);
       continue;
     }

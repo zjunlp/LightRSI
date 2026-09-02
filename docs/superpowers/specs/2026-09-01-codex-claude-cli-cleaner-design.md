@@ -48,36 +48,33 @@ existing Host-local schedule and rebase/overlay runtime
 
 The CLI is a product composition root. It imports public Cleaner APIs and adapter bridge factories but never reads a journal, native message, response payload, or task registry. The feature package stays Host-independent and does not import products or adapters. Adapters retain native persistence and real rewrite behavior and do not know CLI syntax, TTY state, or prompts.
 
-## Shared workflow interface
+## Implemented public composition boundary
 
-`ContextCleanerHostBridge` gains the narrow metadata-only operation:
+The shared feature already exposes `analyzeContextCleanSession` and
+`createContextCleanerControlPlane`. The former reads the canonical snapshot
+through `ContextCleanerHostBridge.readCleanSnapshot`, builds attribution and
+recommendations, and persists an `analyzed` plan/receipt. The latter validates
+the persisted frozen task targets before delegating `executeApprovedClean`,
+`readCleanReceipt`, and `cancelCleanPlan` to the Host bridge.
+
+The CLI consumes only this small product-facing interface:
 
 ```ts
-readCleanAnalysis(sessionId: string): Promise<ContextCleanHostAnalysis>
+interface CleanCommandBackend {
+  analyze(sessionId: string): Promise<CleanPlanView>;
+  readPlan(planId: string): Promise<CleanPlanView | undefined>;
+  approve(planId: string, selectedTaskIds: string[]): Promise<CleanReceiptView>;
+  readReceipt(planId: string): Promise<CleanReceiptView | undefined>;
+  cancel(planId: string): Promise<CleanReceiptView>;
+}
 ```
 
-`ContextCleanHostAnalysis` contains a canonical `ContextCleanSnapshot`, optional `contextWindowTokens`, and one task evidence record per known task. It does not expose a registry or raw Host data. The feature workflow exposes:
-
-```ts
-analyze(params): Promise<ContextCleanPlan>
-selectAndSchedule(params): Promise<ContextCleanReceipt>
-readStatus(planId): Promise<ContextCleanPlanStatus>
-cancel(planId): Promise<ContextCleanReceipt>
-```
-
-`analyze` builds a task breakdown from the snapshot, uses the existing recommendation provider/fallback, and persists an `analyzed` plan. It never schedules a rewrite. `selectAndSchedule` validates task IDs against the persisted plan and builds the complete frozen approval internally; CLI callers cannot submit item IDs or digests.
-
-## Schedule transaction
-
-The existing public `executeApprovedClean` bridge operation remains the adapter-facing entry point. Its shared control-plane implementation becomes an internal two-phase transaction:
-
-```text
-validate frozen approval and current snapshot
--> write Host-local schedule pointer
--> transition shared plan approved -> scheduled
-```
-
-If the local schedule write fails, the shared plan remains `approved`. The Host-local pointer has only plan/session/revision identity; it does not copy selected items, digests, raw payloads, or receipts. Existing Codex response-chain and Claude overlay runtimes continue to perform the actual rewrite and write applied receipts only after successful upstream acceptance.
+`createHostCleanCommandBackend` is the only CLI composition point. It resolves
+the stored plan, derives the exact `itemIds` and `itemDigests` internally, and
+passes them to the existing bridge. The CLI never receives those targets or
+native Host state. Codex response-chain rebase and Claude overlay execution
+remain responsible for actual rewrites and for applied receipts after upstream
+success.
 
 ## CLI behavior
 
@@ -95,21 +92,35 @@ lightrsi <host> clean --plan <plan-id> --select <task-id,...>
 
 Codex and Claude Code installers add `lightrsi-clean` and remove only known legacy cleaner bridge names. The generated skill may run `lightrsi <host> clean` when explicitly invoked, which is a non-interactive analysis-only flow. It may not add `--plan`, `--select`, or `--cancel`, confirm a plan, or parse output to invoke a follow-up command. Codex keeps `allow_implicit_invocation: false`; Claude keeps `disable-model-invocation: true`.
 
+## Installation boundary
+
+The source-checkout entrypoints `pnpm cleaner:install:codex` and
+`pnpm cleaner:install:claude-code` are product/release orchestration only. They
+build the shared CLI, recovery MCP, and selected adapter, then delegate all Host
+configuration changes to the existing adapter installer. They do not implement
+Cleaner analysis, selection, scheduling, or rewrite logic.
+
+The adapter installer installs both the canonical CLI launcher and the
+analysis-only `lightrsi-clean` command skill. On Windows it also writes `.cmd`
+launchers; on Unix-like systems it retains executable links. A missing or stale
+build is rejected before Host installation when `--skip-build` is used.
+
 ## Files and ownership
 
-- `components/packages/features/cleaner/src/{analysis,clean-workflow,clean-control-plane}.ts`: Host-independent analysis and plan lifecycle orchestration.
-- `components/adapters/{codex,claude-code}/src/context-cleaner/analysis.ts`: Host-native snapshot and registry evidence converted to the narrow shared analysis contract.
-- `components/products/cli/src/{clean,clean-args,clean-renderer,clean-prompt}.ts`: canonical command parsing, presentation, and injected TTY interaction.
-- `components/products/cli/src/hosts/{registry,codex,claude-code}.ts` and `dispatch.ts`: composition and routing only.
+- `components/packages/features/cleaner/src/{orchestrator,recommendation,token-accounting,clean-*-store}.ts`: Host-independent analysis, recommendation fallback, and plan/receipt lifecycle orchestration.
+- `components/adapters/{codex,claude-code}/src/context-cleaner/**`: canonical snapshots, Host schedules, and actual rewrites only.
+- `components/products/cli/src/{clean,clean-renderer,clean-prompt}.ts`: canonical grammar, public DTO presentation, and TTY interaction only.
+- `components/products/cli/src/hosts/{cleaner,codex,claude-code}.ts` and `dispatch.ts`: product composition and routing only.
 - `components/adapters/shared/command-skill-bridge.ts`: constrained skill installation only.
+- `scripts/install-cleaner.mjs`: cross-platform source build/install orchestration only.
+- `components/adapters/shared/{cli-bin-install,host-cli-bin-install,windows-command-launcher}.ts`: cross-platform command launchers only.
 
 ## Acceptance tests
 
 1. An analyzed plan accounts for all effective context and cannot select a protected or unknown task.
 2. A stale selection and an incomplete tool pair cannot schedule a rewrite.
-3. A local schedule write failure does not create a shared `scheduled` plan.
-4. Codex and Claude expose metadata-only analysis; raw native payloads are absent from returned and persisted data.
-5. TTY begins with every selectable task unchecked and refuses to schedule when confirmation is declined.
-6. Non-TTY prints a plan and explicit command but does not schedule.
-7. Applied status reports Host evidence and actual savings, not estimates.
-8. Generated command skills cannot autonomously select or confirm cleaning.
+3. Codex and Claude expose metadata-only analysis; raw native payloads are absent from returned and persisted data.
+4. TTY begins with every selectable task unchecked and refuses to schedule when confirmation is declined.
+5. Non-TTY prints the full plan, numbered selectable task IDs, protected rows, and an explicit follow-up command without scheduling.
+6. `--status` renders estimated, scheduled, applied, and fallback values separately; applied values require Host evidence.
+7. Generated command skills invoke only analysis and cannot autonomously select, confirm, cancel, or follow up.

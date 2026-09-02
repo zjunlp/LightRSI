@@ -60,3 +60,49 @@ test("startDaemon replaces a stale pid when the configured proxy port is unhealt
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("startDaemon waits for a healthy proxy when the wall clock jumps forward", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lightrsi-codex-daemon-monotonic-"));
+  const originalDateNow = Date.now;
+  let healthProbeClockCalls = 0;
+  try {
+    const proxyPort = await reserveUnusedPort();
+    const stateDir = join(dir, "state");
+    const configPath = join(dir, "tokenpilot.json");
+    const config = normalizeTokenPilotCodexConfig({
+      proxyPort,
+      stateDir,
+      upstreamProvider: "OPENAI",
+      upstream: {
+        name: "OpenAI",
+        baseUrl: "http://127.0.0.1:9",
+        wireApi: "responses",
+        requiresOpenAIAuth: true,
+      },
+    });
+    await mkdir(stateDir, { recursive: true });
+    await writeTokenPilotCodexConfig(config, configPath);
+
+    Object.defineProperty(Date, "now", {
+      configurable: true,
+      value: () => {
+        const stack = new Error().stack ?? "";
+        if (!stack.includes("waitForProxyHealthy")) return originalDateNow();
+        healthProbeClockCalls += 1;
+        return healthProbeClockCalls === 1 ? 1_000 : 12_000;
+      },
+    });
+
+    const result = await startDaemon(config, {
+      configPath,
+      cliPath: join(process.cwd(), "dist", "cli.js"),
+    });
+
+    assert.equal(result.running, true);
+    assert.equal(result.started, true);
+    await stopDaemon(config);
+  } finally {
+    Object.defineProperty(Date, "now", { configurable: true, value: originalDateNow });
+    await rm(dir, { recursive: true, force: true });
+  }
+});

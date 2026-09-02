@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+import { performance } from "node:perf_hooks";
 import { createServer } from "node:net";
 import { LIGHTRSI_VERSION } from "@lightrsi/kernel";
 import {
@@ -32,6 +33,24 @@ import { installHostCliBin } from "../../shared/host-cli-bin-install.js";
 
 function quoteToml(value: string): string {
   return JSON.stringify(value);
+}
+
+const RESERVED_CODEX_PROVIDER_PROXY_NAMES: Record<string, string> = {
+  openai: "tokenpilot-openai",
+};
+
+function reservedCodexProviderProxyName(providerName: string): string | undefined {
+  return RESERVED_CODEX_PROVIDER_PROXY_NAMES[providerName];
+}
+
+function builtInCodexProviderConfig(providerName: string): CodexProviderConfig | undefined {
+  if (providerName !== "openai") return undefined;
+  return {
+    name: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    wireApi: "responses",
+    requiresOpenAIAuth: true,
+  };
 }
 
 function replaceOrInsertRootAssignment(text: string, key: string, value: string): string {
@@ -110,6 +129,21 @@ function rewriteProviderSectionForProxy(text: string, params: {
     ...sectionLines,
     ...lines.slice(endIndex),
   ].join("\n");
+}
+
+function removeProviderSectionFamily(text: string, providerName: string): string {
+  const prefix = `model_providers.${providerName}`;
+  let removing = false;
+  const kept: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const sectionMatch = /^\s*\[([^\]]+)\]\s*$/.exec(line);
+    if (sectionMatch) {
+      const sectionName = sectionMatch[1]!;
+      removing = sectionName === prefix || sectionName.startsWith(`${prefix}.`);
+    }
+    if (!removing) kept.push(line);
+  }
+  return kept.join("\n");
 }
 
 function upsertMcpServerSection(text: string, params: {
@@ -228,10 +262,10 @@ async function resolveAvailableCodexProxyPort(
   params?: { waitForPreferredMs?: number },
 ): Promise<number> {
   const waitForPreferredMs = params?.waitForPreferredMs ?? 0;
-  const deadline = Date.now() + waitForPreferredMs;
+  const deadline = performance.now() + waitForPreferredMs;
   do {
     if (await canListenOnPort(preferredPort)) return preferredPort;
-    if (Date.now() >= deadline) break;
+    if (performance.now() >= deadline) break;
     await new Promise((resolve) => setTimeout(resolve, 50));
   } while (true);
   for (let port = preferredPort + 1; port <= preferredPort + 20; port += 1) {
@@ -390,9 +424,11 @@ export async function installCodexTokenPilot(params?: {
   commandSkillNames: string[];
   cliBinInstalled: boolean;
   cliBinPath: string;
+  cliLauncherPath?: string;
   cliBinDir: string;
   cliBinDirOnPath: boolean;
   hostCliBinPath?: string;
+  hostCliLauncherPath?: string;
   mcpProbe: {
     ok: boolean;
     detail: string;
@@ -414,11 +450,13 @@ export async function installCodexTokenPilot(params?: {
   const persistedProviderName = tokenPilotConfig.providerName !== "tokenpilot"
     ? tokenPilotConfig.providerName
     : undefined;
-  const providerName = (existingRootProvider
+  const selectedProviderName = (existingRootProvider
     || params?.providerName?.trim()
     || tokenPilotConfig.upstreamProvider
     || persistedProviderName
     || "OpenAI");
+  const reservedProviderProxyName = reservedCodexProviderProxyName(selectedProviderName);
+  const providerName = reservedProviderProxyName ?? selectedProviderName;
   const interceptedProvider = await readCodexProviderFromToml(providerName, codexConfigPath);
   const previousProxyBaseUrl = `http://127.0.0.1:${previousProxyPort}/v1`;
   const existingInterceptedProxyBaseUrl = normalizeLocalProxyBaseUrl(interceptedProvider?.baseUrl);
@@ -428,10 +466,10 @@ export async function installCodexTokenPilot(params?: {
   const installedProviderLooksFresh = existingInterceptedProxyBaseUrl === previousProxyBaseUrl;
   const upstreamProvider = providerAlreadyRouted || installedProviderLooksFresh
     ? tokenPilotConfig.upstream
-    : interceptedProvider;
+    : builtInCodexProviderConfig(selectedProviderName) ?? interceptedProvider;
   tokenPilotConfig.enabled = true;
   tokenPilotConfig.providerName = providerName;
-  tokenPilotConfig.upstreamProvider = providerName;
+  tokenPilotConfig.upstreamProvider = selectedProviderName;
   if (
     upstreamProvider?.baseUrl
     && !isLoopbackProxyProvider(upstreamProvider)
@@ -450,6 +488,9 @@ export async function installCodexTokenPilot(params?: {
     await copyFile(codexConfigPath, `${codexConfigPath}.tokenpilot.bak`);
   }
   let next = existing;
+  if (reservedProviderProxyName) {
+    next = removeProviderSectionFamily(next, selectedProviderName);
+  }
   next = replaceOrInsertRootAssignment(next, "model_provider", quoteToml(providerName));
   next = rewriteProviderSectionForProxy(next, {
     providerName,
@@ -483,12 +524,14 @@ export async function installCodexTokenPilot(params?: {
   const cliBin = await installLightRsiCliBin({
     adapterRoot: adapterRootFromHere(),
     binDir: params?.cliBinDir,
+    platform: params?.platform,
   });
   const hostCliBin = cliBin.installed
     ? await installHostCliBin({
       adapterRoot: adapterRootFromHere(),
       host: "codex",
       binDir: cliBin.binDir,
+      platform: params?.platform,
     })
     : undefined;
   await rememberCliHostPathOverrides("codex", {
@@ -526,9 +569,11 @@ export async function installCodexTokenPilot(params?: {
     commandSkillNames: commandSkillBridge.skillNames,
     cliBinInstalled: cliBin.installed,
     cliBinPath: cliBin.binPath,
+    cliLauncherPath: cliBin.launcherPath,
     cliBinDir: cliBin.binDir,
     cliBinDirOnPath: cliBin.binDirOnPath,
     hostCliBinPath: hostCliBin?.binPath,
+    hostCliLauncherPath: hostCliBin?.launcherPath,
     mcpProbe: {
       ...mcpProbeResult,
       degraded: !mcpProbeResult.ok,

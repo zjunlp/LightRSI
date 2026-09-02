@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
+import { performance } from "node:perf_hooks";
 import type { TokenPilotClaudeCodeConfig } from "./config.js";
 
 export type ClaudeCodeDaemonStatus = {
@@ -52,8 +53,8 @@ async function waitForGatewayHealthy(config: TokenPilotClaudeCodeConfig, params?
 }): Promise<boolean> {
   const timeoutMs = params?.timeoutMs ?? 5_000;
   const intervalMs = params?.intervalMs ?? 150;
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() <= deadline) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() <= deadline) {
     if (await isGatewayHealthy(config)) return true;
     if (params?.pid && !isProcessRunning(params.pid)) return false;
     await sleep(intervalMs);

@@ -56,20 +56,24 @@ type NormalizeCodexConfigOptions = {
   configPath?: string;
 };
 
+function runtimeHomeDir(): string {
+  return process.env.HOME?.trim() || process.env.USERPROFILE?.trim() || homedir();
+}
+
 export function expandHomePath(value: string): string {
-  if (value === "~") return homedir();
-  if (value.startsWith("~/")) return join(homedir(), value.slice(2));
+  if (value === "~") return runtimeHomeDir();
+  if (value.startsWith("~/")) return join(runtimeHomeDir(), value.slice(2));
   return value;
 }
 
 export function defaultCodexConfigPath(): string {
-  return join(homedir(), ".codex", "config.toml");
+  return join(runtimeHomeDir(), ".codex", "config.toml");
 }
 
 export function defaultTokenPilotConfigPath(): string {
   return process.env.TOKENPILOT_CODEX_CONFIG
     ? resolve(process.env.TOKENPILOT_CODEX_CONFIG)
-    : join(homedir(), ".codex", "tokenpilot.json");
+    : join(runtimeHomeDir(), ".codex", "tokenpilot.json");
 }
 
 export function defaultStateDir(configPath = defaultTokenPilotConfigPath()): string {
@@ -79,7 +83,7 @@ export function defaultStateDir(configPath = defaultTokenPilotConfigPath()): str
 export function defaultHooksConfigPath(): string {
   return process.env.CODEX_HOOKS_CONFIG_PATH
     ? resolve(process.env.CODEX_HOOKS_CONFIG_PATH)
-    : join(homedir(), ".codex", "hooks.json");
+    : join(runtimeHomeDir(), ".codex", "hooks.json");
 }
 
 export function resolvedCodexConfigPath(): string {

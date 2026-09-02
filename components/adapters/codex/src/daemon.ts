@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile, open } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { spawn } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import type { TokenPilotCodexConfig } from "./config.js";
 
 export type DaemonStatus = {
@@ -37,8 +38,8 @@ function isProcessRunning(pid: number): boolean {
 }
 
 async function waitForProcessExit(pid: number, timeoutMs = 3_000, intervalMs = 100): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() <= deadline) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() <= deadline) {
     if (!isProcessRunning(pid)) return true;
     await sleep(intervalMs);
   }
@@ -84,8 +85,8 @@ async function waitForProxyHealthy(config: TokenPilotCodexConfig, params?: {
 }): Promise<boolean> {
   const timeoutMs = params?.timeoutMs ?? 5_000;
   const intervalMs = params?.intervalMs ?? 150;
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() <= deadline) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() <= deadline) {
     if (await isProxyHealthy(config)) return true;
     if (params?.pid && !isProcessRunning(params.pid)) return false;
     await sleep(intervalMs);

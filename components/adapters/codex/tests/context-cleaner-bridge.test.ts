@@ -296,6 +296,39 @@ test("Codex cleaner bridge does not schedule a non-scheduled control-plane recei
   });
 });
 
+test("Codex cleaner bridge preserves conservative recommendation fallback through scheduling", async () => {
+  await withTempState(async (stateDir) => {
+    const bridge = createCodexContextCleanerBridge({
+      stateDir,
+      controlPlane: {
+        ...fakeControlPlane(),
+        async executeApprovedClean() {
+          return { ...pendingReceipt("scheduled"), fallbackUsed: true };
+        },
+      },
+    });
+    const receipt = await bridge.executeApprovedClean({
+      schemaVersion: CONTEXT_CLEAN_SCHEMA_VERSION,
+      cleanPlanId: "clean-plan-1",
+      hostId: "codex",
+      sessionId: "codex-cleaner-session",
+      baseRevision: "revision-before",
+      approvedAt: "2026-08-21T00:00:00.000Z",
+      selectedTasks: [{
+        taskId: "task-1",
+        itemIds: ["item-1"],
+        itemDigests: { "item-1": "digest-1" },
+      }],
+    });
+    assert.equal(receipt.status, "scheduled");
+    assert.equal(receipt.fallbackUsed, true);
+    assert.equal((await readCodexCleanerSchedule({
+      stateDir,
+      sessionId: "codex-cleaner-session",
+    })).outcome, "ready");
+  });
+});
+
 test("Codex cleaner bridge lists persisted sessions and reads canonical effective history", async () => {
   const stateDir = await mkdtemp(join(tmpdir(), "lightrsi-codex-cleaner-bridge-"));
   try {

@@ -1,8 +1,11 @@
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename, dirname, join } from "node:path";
-import { homedir } from "node:os";
+import { performance } from "node:perf_hooks";
 import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
+import { resolveCliHomeDir } from "../context-store.js";
+
+const DEFAULT_VISUAL_DAEMON_STARTUP_TIMEOUT_MS = 15_000;
 
 function childProcessExecArgv(): string[] {
   return process.execArgv.filter((arg) => arg !== "--test");
@@ -19,8 +22,8 @@ function isProcessRunning(pid: number): boolean {
 }
 
 async function waitForVisualServer(url: string, timeoutMs = 5000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
     try {
       const resp = await fetch(`${url}/health`);
       if (resp.ok) return true;
@@ -72,7 +75,7 @@ export function resolveCliEntryPathFromHostModule(hostModulePath: string): strin
 }
 
 export function sharedVisualRootDir(): string {
-  return join(homedir(), ".lightrsi", "state");
+  return join(resolveCliHomeDir(), ".lightrsi", "state");
 }
 
 export function sharedVisualPidPath(): string {
@@ -110,7 +113,7 @@ export async function ensureDetachedVisualDaemon<TMeta>(params: {
   readPid(meta: TMeta | undefined): number | undefined;
   timeoutMs?: number;
 }): Promise<string> {
-  const timeoutMs = params.timeoutMs ?? 5000;
+  const timeoutMs = params.timeoutMs ?? DEFAULT_VISUAL_DAEMON_STARTUP_TIMEOUT_MS;
   const currentMeta = await readJsonMeta<TMeta>(params.metaPath);
   const currentUrl = params.readUrl(currentMeta);
   const currentPid = Number(params.readPid(currentMeta) ?? 0);
@@ -138,8 +141,8 @@ export async function ensureDetachedVisualDaemon<TMeta>(params: {
   await log.close().catch(() => undefined);
   await writeFile(params.pidPath, `${child.pid}\n`, "utf8");
 
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
     const parsed = await readJsonMeta<TMeta>(params.metaPath);
     const parsedUrl = params.readUrl(parsed);
     const parsedPid = Number(params.readPid(parsed) ?? 0);

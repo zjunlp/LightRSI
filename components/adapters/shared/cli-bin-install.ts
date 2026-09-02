@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
-import { chmod, link, mkdir, symlink, unlink } from "node:fs/promises";
+import { chmod, copyFile, mkdir, symlink, unlink } from "node:fs/promises";
 import { join, resolve, delimiter } from "node:path";
+import { installWindowsNodeCommandLauncher } from "./windows-command-launcher.js";
 
 function cliDistPathFromAdapterRoot(adapterRoot: string): string {
   const bundledPath = resolve(adapterRoot, "dist", "lightrsi.js");
@@ -16,7 +17,7 @@ async function createCliLink(targetPath: string, binPath: string): Promise<void>
     if (process.platform !== "win32" || !["EACCES", "EPERM", "UNKNOWN"].includes(code ?? "")) {
       throw error;
     }
-    await link(targetPath, binPath);
+    await copyFile(targetPath, binPath);
   }
 }
 
@@ -24,15 +25,22 @@ export async function installLightRsiCliBin(params: {
   adapterRoot: string;
   homeDir?: string;
   binDir?: string;
+  platform?: NodeJS.Platform;
+  nodePath?: string;
 }): Promise<{
   installed: boolean;
   binPath: string;
+  launcherPath?: string;
+  legacyLauncherPath?: string;
   binDir: string;
   cliDistPath: string;
   binDirOnPath: boolean;
 }> {
   const homeDir = params.homeDir ?? process.env.HOME ?? process.env.USERPROFILE ?? "";
-  const binDir = params.binDir ?? join(homeDir, ".local", "bin");
+  const binDir = params.binDir
+    ?? process.env.LIGHTRSI_BIN_DIR
+    ?? process.env.LIGHTMEM2_BIN_DIR
+    ?? join(homeDir, ".local", "bin");
   const cliDistPath = cliDistPathFromAdapterRoot(params.adapterRoot);
   const binPath = join(binDir, "lightrsi");
   const legacyBinPath = join(binDir, "lightmem2");
@@ -59,10 +67,24 @@ export async function installLightRsiCliBin(params: {
   await unlink(legacyBinPath).catch(() => undefined);
   await createCliLink(cliDistPath, legacyBinPath);
   await chmod(legacyBinPath, 0o755).catch(() => undefined);
+  const launcherPath = await installWindowsNodeCommandLauncher({
+    binPath,
+    targetPath: cliDistPath,
+    platform: params.platform,
+    nodePath: params.nodePath,
+  });
+  const legacyLauncherPath = await installWindowsNodeCommandLauncher({
+    binPath: legacyBinPath,
+    targetPath: cliDistPath,
+    platform: params.platform,
+    nodePath: params.nodePath,
+  });
 
   return {
     installed: true,
     binPath,
+    launcherPath,
+    legacyLauncherPath,
     binDir,
     cliDistPath,
     binDirOnPath,

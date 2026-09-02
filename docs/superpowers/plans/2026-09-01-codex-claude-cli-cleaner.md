@@ -4,7 +4,7 @@
 
 **Goal:** Implement the documented human-approved Cleaner CLI flow for Codex and Claude Code, including analysis, explicit approval, Host scheduling, status, cancellation, and constrained command skills.
 
-**Architecture:** Shared Cleaner code assembles and persists metadata-only plans; Codex and Claude adapters expose analysis and keep native schedule/rewrite behavior; the CLI composes those public boundaries and owns only command parsing and interactive presentation. OpenClaw stays outside this plan.
+**Architecture:** Shared Cleaner code already assembles and persists metadata-only plans; Codex and Claude adapters already keep native schedule/rewrite behavior; the CLI composes those public boundaries and owns only command parsing and interactive presentation. OpenClaw stays outside this plan.
 
 **Tech Stack:** TypeScript, Node test runner with `tsx`, pnpm workspaces, existing Cleaner plan/receipt stores, Codex response-chain rebase, Claude gateway overlay.
 
@@ -22,6 +22,39 @@
 - Preserve `docs/handoffs/` as an untracked user artifact.
 
 ---
+
+## Superseded implementation phases
+
+Tasks 1–7 below describe a pre-PR #62 design. Their functional work is
+already provided by the merged Cleaner orchestrator, Codex/Claude bridges, and
+the CLI `CleanCommandBackend` composition. Do not recreate the proposed
+`readCleanAnalysis`, `clean-workflow`, or adapter analysis modules: doing so
+would duplicate the established public boundary.
+
+## Remaining CLI hardening (implemented in this branch)
+
+- [x] Add `lightrsi-clean` to Codex and Claude installers. It executes only
+  `lightrsi <host> clean`, keeps both model-invocation restrictions, removes
+  only `lightmem2-clean`, and forbids selection, confirmation, cancellation,
+  status, and follow-up execution.
+- [x] Make interactive clean render the complete `CleanPlanView` before the
+  selector and begin with zero selected tasks.
+- [x] Limit parsing to the five documented canonical forms; reject mixed or
+  reordered flags rather than silently ignoring them.
+- [x] Make non-TTY analysis print numbered selectable task IDs and an explicit
+  zero-default follow-up command.
+- [x] Render receipt estimated, scheduled, applied, and fallback state
+  separately; applied savings require receipt evidence.
+- [x] Add one-pass source installers for Codex and Claude Code that build the
+  shared CLI, recovery MCP, and selected adapter before invoking the existing
+  Host installer.
+- [x] Install Windows `.cmd` launchers (prefer an npm bin directory already on
+  `PATH`) so `lightrsi <host> clean` is callable without a repository-relative
+  `node components/...` prefix.
+- [x] Extend release smoke coverage to install each self-contained Host archive
+  and verify the constrained `lightrsi-clean` skill and CLI launchers.
+
+## Historical pre-merge tasks (reference only)
 
 ### Task 1: Add metadata-only analysis contracts
 
