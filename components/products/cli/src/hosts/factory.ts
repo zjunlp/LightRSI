@@ -4,7 +4,7 @@ import type { CliHostPathOverrides } from "../context-store.js";
 import { registerCleanCommandBackendResolver } from "../clean.js";
 import { createClaudeCodeCleanCommandBackend, createClaudeCodeCliBridge } from "./claude-code.js";
 import { createCodexCleanCommandBackend, createCodexCliBridge } from "./codex.js";
-import { createOpenClawCliBridge } from "./openclaw.js";
+import { createOpenClawCleanCommandBackend, createOpenClawCliBridge } from "./openclaw.js";
 import {
   CLI_HOSTS,
   getCliHostRegistration,
@@ -57,6 +57,7 @@ export function registerBuiltInCliHostProducts(): void {
   registerCleanCommandBackendResolver(({ hostId, pathOverrides }) => {
     if (hostId === "codex") return createCodexCleanCommandBackend(pathOverrides);
     if (hostId === "claude-code") return createClaudeCodeCleanCommandBackend(pathOverrides);
+    if (hostId === "openclaw") return createOpenClawCleanCommandBackend();
     return undefined;
   });
 }

@@ -72,11 +72,13 @@ import { __testHooks, contextSafeRecovery, proxyRuntimeHelpers } from "./plugin-
 import { createWorkspaceHintStore } from "./plugin-workspace-hints.js";
 import { createOpenClawStatePathResolver } from "./context-stack/integration/host-adapter.js";
 import { initializeOpenClawTokenPilotPreset } from "./preset.js";
+import { createOpenClawContextCleanerBridge } from "./context-cleaner/index.js";
 
 module.exports = {
   id: "tokenpilot",
   name: "TokenPilot Runtime Optimizer",
   __testHooks,
+  createOpenClawContextCleanerBridge,
 
   register(api: any) {
     initializeOpenClawTokenPilotPreset();
