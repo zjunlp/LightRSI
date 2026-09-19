@@ -19,7 +19,7 @@ A plugin is a self-contained package with:
 | :-- | :-- | :-- |
 | [TokenPilot](/plugin-catalog/tokenpilot/overview) | Cache-aware context management | Stable |
 
-TokenPilot currently provides full host integrations for OpenClaw, Codex, and Claude Code. A narrower DeepSeek Harness compatibility adapter is maintained separately.
+TokenPilot integrates with OpenClaw, Codex, Claude Code, and [DeepSeek Harness](/hosts/deepseek-harness). The Harness adapter provides optional context eviction and session status through a native Cordis plugin; see [Host Compatibility](/hosts/compatibility) for differences.
 
 ## Next
 

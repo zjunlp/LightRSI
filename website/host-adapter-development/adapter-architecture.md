@@ -11,7 +11,7 @@ From [HOSTS.md](https://github.com/zjunlp/LightRSI/blob/main/components/adapters
 | OpenClaw | production | bundled plugin + embedded runtime | `pnpm component:install:tokenpilot:openclaw` or `npm --prefix components/adapters/openclaw run install:release` |
 | Codex CLI | available | hooks + local Responses proxy + shared CLI | `npm --prefix components/adapters/codex run build` then `npm --prefix components/adapters/codex run install:codex` |
 | Claude Code | available | gateway routing + observability hooks + shared CLI | `npm --prefix components/adapters/claude-code run build` then `npm --prefix components/adapters/claude-code run install:claude-code` |
-| DeepSeek Harness | available | Cordis plugin + durable projection + compatibility smoke | `pnpm --filter @lightrsi/deepseek-harness-adapter compatibility:smoke -- --dsh-checkout=/absolute/path/to/deepseek-harness` |
+| DeepSeek Harness | available | Native Cordis plugin + opt-in eviction + durable status projection | Build and pack the adapter, then add the `.tgz` through the Harness profile plugin installer; [installation commands](/hosts/deepseek-harness#install) |
 
 ## Adapter Responsibilities
 

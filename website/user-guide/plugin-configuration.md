@@ -6,6 +6,8 @@ Each plugin exposes configuration that can be tuned for your needs.
 
 ### Via CLI
 
+These controls apply to the shared CLI hosts, with feature availability shown in [Host Compatibility](/hosts/compatibility). DeepSeek Harness is configured through its Harness profile.
+
 ```bash
 # Mode presets
 lightrsi mode conservative
@@ -22,11 +24,14 @@ lightrsi eviction on
 
 Edit the plugin config file directly:
 
-```bash
-# OpenClaw: ~/.openclaw/openclaw.json
-# Codex:    ~/.codex/tokenpilot.json
-# Claude:   ~/.claude/tokenpilot.json
-```
+| Host | Configuration |
+| :-- | :-- |
+| OpenClaw | `~/.openclaw/openclaw.json` |
+| Codex | `~/.codex/tokenpilot.json` |
+| Claude Code | `~/.claude/tokenpilot.json` |
+| DeepSeek Harness | `tokenpilot-dsh` in the selected Harness profile's `cordis.patch.yml` |
+
+DeepSeek Harness is disabled by default. Configure its persistent `stateDir`, estimator, and eviction settings before enabling it. See the [configuration example](/hosts/deepseek-harness#configure-and-enable).
 
 ## Next
 

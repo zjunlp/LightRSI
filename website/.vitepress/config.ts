@@ -105,6 +105,7 @@ export default defineConfig({
             { text: 'OpenClaw', link: '/hosts/openclaw' },
             { text: 'Codex', link: '/hosts/codex' },
             { text: 'Claude Code', link: '/hosts/claude-code' },
+            { text: 'DeepSeek Harness', link: '/hosts/deepseek-harness' },
           ],
         },
       ],

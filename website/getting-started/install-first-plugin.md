@@ -72,7 +72,26 @@ export TOKENPILOT_CLAUDE_CODE_CONFIG="/path/to/tokenpilot.json"
 corepack pnpm cleaner:install:claude-code
 ```
 
+### DeepSeek Harness
+
+Build and package the adapter from the LightRSI repository:
+
+```bash
+corepack pnpm --filter @lightrsi/deepseek-harness-adapter build
+corepack pnpm --filter @lightrsi/deepseek-harness-adapter pack --pack-destination ./artifacts
+```
+
+Then, from your DeepSeek Harness checkout, install the generated archive into your profile:
+
+```bash
+node --import tsx/esm apps/cli/src/bin.ts plugin --profile web add /absolute/path/to/lightrsi-deepseek-harness-adapter-<version>.tgz
+```
+
+Replace the archive path and profile as needed. The plugin is registered as `tokenpilot-dsh` and remains disabled until you configure and enable it. Supply a durable `stateDir` and the estimator and eviction settings described in [DeepSeek Harness Configuration](/hosts/deepseek-harness#configure-and-enable).
+
 ## Verify Installation
+
+For OpenClaw, Codex, and Claude Code:
 
 ```bash
 lightrsi doctor
@@ -90,15 +109,26 @@ lightrsi claude-code clean --help
 
 Look for: `plugin entry enabled`, `config enabled`, `proxy healthy: yes`.
 
+For DeepSeek Harness, open a session with the configured profile and run:
+
+```text
+/tokenpilot-status
+```
+
+This reports estimator, scheduling, application, and deferral state without creating a model turn. It is the Harness verification entrypoint rather than a shared CLI `doctor` command.
+
 ## What Changed
 
-The installer modifies these files (backups saved as `.tokenpilot.bak`):
+Installation and configuration locations differ by host:
 
-| Host | Files Modified |
+| Host | Configuration Location |
 | :-- | :-- |
 | OpenClaw | `~/.openclaw/openclaw.json` |
 | Codex | `~/.codex/tokenpilot.json`, `~/.codex/hooks.json` |
 | Claude Code | `~/.claude/settings.json`, `~/.claude/tokenpilot.json`, `~/.claude/.claude.json` |
+| DeepSeek Harness | `$DSH_HOME/profiles/<profile>/cordis.patch.yml` (default home: `~/.dsh`); [profile setup](/hosts/deepseek-harness#configure-and-enable) |
+
+The OpenClaw, Codex, and Claude Code installers preserve the host configuration files they back up as `.tokenpilot.bak`. DeepSeek Harness uses its own profile plugin installer; do not assume the same backup convention.
 
 ## Next
 

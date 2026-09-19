@@ -1,20 +1,17 @@
 # Quick Start
 
-A minimal path from clone to a verified running session. You will have LightRSI installed with TokenPilot active in under 5 minutes.
+A path from clone to a verified running session. Choose OpenClaw, Codex, Claude Code, or DeepSeek Harness at each host-specific step below.
 
-## 1. Clone and Build
+## 1. Prepare the Repository
 
 ```bash
 git clone https://github.com/zjunlp/LightRSI.git
 cd LightRSI
 corepack enable
 pnpm install
-pnpm build
-pnpm lightrsi:build
-pnpm lightrsi:install
 ```
 
-The last command installs the `lightrsi` CLI entrypoint at `~/.local/bin/lightrsi`. Make sure `~/.local/bin` is on your `PATH`.
+The host-specific commands below build and install the selected integration. DeepSeek Harness also requires a working Harness checkout and Node.js matching the [adapter requirements](/hosts/deepseek-harness#install).
 
 ## 2. Pick Your Host
 
@@ -22,26 +19,40 @@ Choose your agent host and run the matching install command:
 
 ::: code-group
 ```bash [OpenClaw]
+pnpm lightrsi:build
+pnpm lightrsi:install
 pnpm component:install:tokenpilot:openclaw
 ```
 
 ```bash [Codex]
-npm --prefix components/adapters/codex run build
-npm --prefix components/adapters/codex run install:codex
+corepack pnpm cleaner:install:codex
 ```
 
 ```bash [Claude Code]
-npm --prefix components/adapters/claude-code run build
-npm --prefix components/adapters/claude-code run install:claude-code
+corepack pnpm cleaner:install:claude-code
+```
+
+```bash [DeepSeek Harness]
+# From the LightRSI repository
+corepack pnpm --filter @lightrsi/deepseek-harness-adapter build
+corepack pnpm --filter @lightrsi/deepseek-harness-adapter pack --pack-destination ./artifacts
+
+# Then, from your DeepSeek Harness checkout
+node --import tsx/esm apps/cli/src/bin.ts plugin --profile web add /absolute/path/to/lightrsi-deepseek-harness-adapter-<version>.tgz
 ```
 :::
 
-Each install command:
-- Updates the host's configuration files
-- Enables the TokenPilot plugin
-- Sets the default `normal` runtime mode
-- Registers required hooks or MCP servers
-- Creates backups of modified files as `.tokenpilot.bak`
+OpenClaw, Codex, and Claude Code installers configure their host integrations. See [Install Your First Plugin](/getting-started/install-first-plugin) for the changes each installer makes.
+
+For OpenClaw, the first two commands separately build and install the shared `lightrsi` CLI used later in this walkthrough; the OpenClaw plugin installer does not install it. The CLI installer is a Bash script, so use a Bash environment (such as WSL on Windows). Its default command directory is `~/.local/bin`; ensure it is on your `PATH`:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+If you set `LIGHTRSI_BIN_DIR`, add that directory instead. Codex and Claude Code's `cleaner:install:*` commands already build and install the shared CLI.
+
+DeepSeek Harness installs the `tokenpilot-dsh` Cordis plugin into the selected profile. Replace the archive path with the generated `.tgz` and `web` with your profile. The plugin is **disabled by default**: supply a persistent `stateDir` and estimator and eviction settings, then enable it as described in [Configure and Enable](/hosts/deepseek-harness#configure-and-enable).
 
 ## 3. Start a Session
 
@@ -62,11 +73,17 @@ Open a new session so SessionStart can start the proxy
 Start Claude Code normally
 Open a new session so SessionStart can start the gateway
 ```
+
+```text [DeepSeek Harness]
+Load the profile containing the configured and enabled tokenpilot-dsh plugin
+Open a Harness session
+Run: /tokenpilot-status
+```
 :::
 
 ## 4. Verify It Works
 
-Run the doctor command to confirm everything is healthy:
+Use the verification command for your host:
 
 ::: code-group
 ```bash [OpenClaw]
@@ -82,9 +99,13 @@ lightrsi codex doctor
 ```bash [Claude Code]
 lightrsi claude-code doctor
 ```
+
+```text [DeepSeek Harness]
+/tokenpilot-status
+```
 :::
 
-Expected output:
+For OpenClaw, Codex, and Claude Code, check the relevant status fields:
 - `plugin entry enabled`
 - `config enabled`
 - `mode normal`
@@ -92,9 +113,11 @@ Expected output:
 - `reduction enabled`
 - `proxy healthy: yes`
 
-## 5. See Your Savings
+For DeepSeek Harness, inspect estimator activity, scheduling, application, and deferrals. The command is read-only and does not create a model turn. See [status field meanings](/hosts/deepseek-harness#verify-in-a-session); an enabled plugin does not imply an eviction has already occurred.
 
-After a few turns, check your report:
+## 5. Inspect Runtime Results
+
+After a few turns, inspect your host's report or status:
 
 ::: code-group
 ```bash [OpenClaw]
@@ -108,19 +131,25 @@ lightrsi codex report
 ```bash [Claude Code]
 lightrsi claude-code report
 ```
+
+```text [DeepSeek Harness]
+/tokenpilot-status
+```
 :::
 
-If you see token and cost metrics instead of "No TokenPilot session stats yet", TokenPilot is actively managing your context.
+For the shared CLI reports, token and cost metrics replace "No TokenPilot session stats yet" once session statistics are available. DeepSeek Harness exposes estimator, scheduled, applied, and deferred state through its native status command; it does not use `lightrsi report`.
 
 ## 6. Visual Inspector
 
-Open the built-in visual inspector to see your session in real time:
+For OpenClaw, Codex, and Claude Code, open the built-in visual inspector:
 
 ```bash
 lightrsi visual
 ```
 
 This opens a browser view showing stable-prefix, reduction, and eviction snapshots.
+
+DeepSeek Harness uses `/tokenpilot-status` for the documented session status workflow; this shared Visual command does not apply to it.
 
 ## What's Next
 

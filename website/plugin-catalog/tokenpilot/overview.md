@@ -32,15 +32,16 @@ TokenPilot is evaluated on PinchBench and Claw-Eval in isolated and continuous m
 
 ## Supported Hosts
 
-TokenPilot has three full host integrations, each with a different integration style. LightRSI also contains a separate DeepSeek Harness compatibility adapter; it is not included in the full TokenPilot feature table below.
+TokenPilot integrates with four hosts. DeepSeek Harness uses a native Cordis plugin for optional context eviction and session status; its setup and capabilities differ from the other adapters.
 
 | Host | Integration | Page |
 | :-- | :-- | :-- |
 | OpenClaw | Native plugin slot | [OpenClaw](/hosts/openclaw) |
 | Codex CLI | Local proxy + hooks | [Codex](/hosts/codex) |
 | Claude Code | Local gateway + MCP | [Claude Code](/hosts/claude-code) |
+| DeepSeek Harness | Native Cordis plugin | [DeepSeek Harness](/hosts/deepseek-harness) |
 
-Features are consistent across hosts. Differences are documented on each host page.
+Feature availability varies by host. See [Host Compatibility](/hosts/compatibility) and each host's setup guide before choosing configuration or commands.
 
 ## Quick Tour
 

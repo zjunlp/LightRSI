@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `lightrsi` CLI is the unified command interface across all hosts. This page documents every command.
+The `lightrsi` CLI provides shared commands for OpenClaw, Codex, and Claude Code. DeepSeek Harness uses its native plugin interface and [`/tokenpilot-status`](/hosts/deepseek-harness#verify-in-a-session).
 
 ## Global Commands
 
@@ -92,6 +92,18 @@ lightrsi claude-code reduction pass toolPayloadTrim <off>
 lightrsi claude-code reduction status
 lightrsi claude-code help
 ```
+
+## DeepSeek Harness Commands
+
+Inside a DeepSeek Harness session:
+
+```text
+/tokenpilot-status
+```
+
+This read-only command reports estimator activity, eligible eviction work, scheduled or applied changes, and deferrals without creating a model turn. The adapter is registered by Cordis as `tokenpilot-dsh`; it does not use the shared `lightrsi` CLI.
+
+See [DeepSeek Harness](/hosts/deepseek-harness) for plugin installation and configuration. The global CLI commands above apply to OpenClaw, Codex, and Claude Code.
 
 ## Next
 

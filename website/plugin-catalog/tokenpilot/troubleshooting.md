@@ -4,7 +4,7 @@ Common problems, symptoms, and fixes for TokenPilot.
 
 ## Quick Diagnostic
 
-Always start with:
+For OpenClaw, Codex, and Claude Code, start with:
 
 ```bash
 lightrsi doctor
@@ -12,6 +12,8 @@ lightrsi status
 ```
 
 These two commands answer most questions about whether TokenPilot is running correctly.
+
+For **DeepSeek Harness**, run `/tokenpilot-status` inside a Harness session. If it is unavailable, verify the active profile and plugin registration. If eviction does not run, check that `tokenpilot-dsh` is enabled and has a durable `stateDir` plus estimator and eviction configuration. See [DeepSeek Harness troubleshooting](/hosts/deepseek-harness#troubleshooting).
 
 ## Install Problems
 

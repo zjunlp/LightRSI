@@ -6,9 +6,9 @@ LightRSI plugins provide reusable agent capabilities. Each plugin is independent
 
 | Plugin | Capability | Status | Hosts |
 | :-- | :-- | :-- | :-- |
-| [TokenPilot](./tokenpilot/overview) | Cache-aware context management | <span class="badge-stable">Stable</span> | OpenClaw, Codex, Claude Code |
+| [TokenPilot](./tokenpilot/overview) | Cache-aware context management | <span class="badge-stable">Stable</span> | OpenClaw, Codex, Claude Code, DeepSeek Harness |
 
-DeepSeek Harness is currently exposed as a compatibility adapter rather than a full TokenPilot plugin surface.
+[DeepSeek Harness](/hosts/deepseek-harness) provides a native Cordis integration with opt-in context eviction and session status. Capabilities vary by host; see [Host Compatibility](/hosts/compatibility).
 
 ## Plugin Statuses
 
