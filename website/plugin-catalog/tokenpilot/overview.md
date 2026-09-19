@@ -1,6 +1,8 @@
 # TokenPilot Overview
 
-TokenPilot is the first official LightRSI plugin. It is a **cache-aware context runtime** that reduces token usage and cost in long-running agent sessions.
+TokenPilot is LightRSI's first **context-management preset**. It composes cache-aware context policies for long-running agent sessions, with the goal of reducing token usage and cost.
+
+[Context Cleaner](/user-guide/context-cleaner) is the user-facing product for reviewing tasks and approving a specific cleanup. It reuses shared task and host rewrite capabilities; its interactive workflow is distinct from TokenPilot's automatic runtime policies.
 
 ## What TokenPilot Does
 

@@ -126,6 +126,8 @@ To disable automatic eviction, set `eviction.enabled` to `false`. To disable the
 
 DeepSeek Harness uses its own plugin installation and `/tokenpilot-status` command. The shared `lightrsi ... doctor`, `report`, `visual`, and runtime-mode walkthroughs for other hosts do not apply to this integration.
 
+The current Cordis entrypoint does not expose a public [Context Cleaner](/user-guide/context-cleaner) workflow. Cleaner backend modules in the repository do not make `/tokenpilot-status` an interactive clean command; automatic eviction and user-approved Cleaner plans are separate capabilities.
+
 For adapter development, see [Adapter Testing](/host-adapter-development/adapter-testing). The compatibility smoke checks package installation and host integration; it is separate from validating eviction with your estimator and live sessions.
 
 ## Next

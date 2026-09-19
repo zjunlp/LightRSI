@@ -24,6 +24,16 @@ Inside a Harness session, run:
 
 This read-only command reports estimator activity, scheduling, application, and deferrals. See [DeepSeek Harness troubleshooting](/hosts/deepseek-harness#troubleshooting) for configuration checks and debug output. Do not use the shared CLI `doctor` command for this adapter.
 
+## Context Cleaner Receipts
+
+For `openclaw`, `codex`, or `claude-code`, inspect an exact plan without rerunning analysis:
+
+```bash
+lightrsi <host> clean --status <plan-id>
+```
+
+Check the receipt's status, reasons, deferred tasks, and fallback information. A scheduled clean is not yet an applied clean. Codex and Claude Code's reports also expose Cleaner savings and fallback information; Codex doctor distinguishes Cleaner MCP health from recovery MCP health. See [Context Cleaner](/user-guide/context-cleaner#_3-check-the-result) for state meanings and apply timing.
+
 ## Log Locations
 
 | Host | Log Location | Notes |

@@ -5,8 +5,7 @@ Codex CLI integration uses a **local proxy + hooks** pattern. TokenPilot runs as
 ## Installation
 
 ```bash
-npm --prefix components/adapters/codex run build
-npm --prefix components/adapters/codex run install:codex
+corepack pnpm cleaner:install:codex
 ```
 
 This command:
@@ -14,8 +13,10 @@ This command:
 - Reroutes that provider through the local TokenPilot proxy
 - Writes `~/.codex/tokenpilot.json`
 - Registers hooks in `~/.codex/hooks.json`
-- Registers the shared `tokenpilot_memory_fault_recover` MCP server
-- Creates the `lightrsi` CLI entrypoint at `~/.local/bin/lightrsi`
+- Builds the shared CLI, recovery MCP, and Codex adapter
+- Registers `tokenpilot_memory_fault_recover` and `lightrsi_cleaner` MCP servers
+- Installs the explicit Cleaner analysis, status, apply, and cancel skills
+- Installs the CLI and Cleaner terminal launcher (see PATH Setup below)
 
 ### Custom Paths
 
@@ -23,8 +24,7 @@ This command:
 export CODEX_CONFIG_PATH="/path/to/config.toml"
 export CODEX_HOOKS_CONFIG_PATH="/path/to/hooks.json"
 export TOKENPILOT_CODEX_CONFIG="/path/to/tokenpilot.json"
-npm --prefix components/adapters/codex run build
-npm --prefix components/adapters/codex run install:codex
+corepack pnpm cleaner:install:codex
 ```
 
 ## Expected Output
@@ -72,7 +72,7 @@ tokenpilot-codex start
 
 ## Standalone CLI
 
-All commands use the standalone CLI:
+Shared CLI commands:
 
 ```bash
 lightrsi codex status
@@ -87,9 +87,25 @@ lightrsi codex reduction mode balanced
 lightrsi codex help
 ```
 
+## Context Cleaner
+
+Type `!lightrsi-clean` yourself inside Codex to open the terminal selector, or run `lightrsi codex clean` in an interactive terminal. Review the host/session and task list. Up/Down moves between selectable tasks, Space toggles them, and Enter approves the checked selection; tasks start unchecked.
+
+The installed `lightrsi-clean` skill provides a separate MCP-form path with controls chosen by Codex. It accepts only the user's selected tasks. Cancellation or an empty selection schedules no rewrite.
+
+An accepted selection is `scheduled` for the next eligible host request. Continue the same session, then inspect the receipt:
+
+```bash
+lightrsi codex clean --status <plan-id>
+```
+
+See [Context Cleaner](/user-guide/context-cleaner) for explicit plan selection, cancellation, protected tasks, and the difference between scheduled and applied savings.
+
 ## PATH Setup
 
-If `lightrsi` is not found after install:
+The installer uses `~/.local/bin` by default on Linux/macOS. On Windows it creates `lightrsi.cmd`, `lightrsi-clean.cmd`, and `tokenpilot-codex.cmd`, using the npm command directory when it is already on `PATH`. `LIGHTRSI_BIN_DIR` can override the command directory.
+
+On Linux/macOS, if `lightrsi` is not found after install:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -98,5 +114,7 @@ export PATH="$HOME/.local/bin:$PATH"
 Add to `~/.bashrc` or `~/.zshrc` to make permanent.
 
 ## Troubleshooting
+
+For Cleaner installation or selection issues, see [Context Cleaner troubleshooting](/user-guide/context-cleaner#troubleshooting). Doctor reports Cleaner MCP and recovery MCP health separately.
 
 See [TokenPilot Troubleshooting](/plugin-catalog/tokenpilot/troubleshooting#codex) for Codex-specific issues.

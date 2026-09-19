@@ -105,6 +105,29 @@ This read-only command reports estimator activity, eligible eviction work, sched
 
 See [DeepSeek Harness](/hosts/deepseek-harness) for plugin installation and configuration. The global CLI commands above apply to OpenClaw, Codex, and Claude Code.
 
+## Context Cleaner Commands
+
+Cleaner is available through the shared CLI for `openclaw`, `codex`, and `claude-code`:
+
+```bash
+lightrsi <host> clean
+lightrsi <host> clean --session <session-id>
+lightrsi <host> clean --plan <plan-id> --select <task-id-1>,<task-id-2>
+lightrsi <host> clean --status <plan-id>
+lightrsi <host> clean --cancel <plan-id>
+```
+
+Analysis does not rewrite context. A terminal may then open a selector; a non-TTY invocation prints the plan without approving it. The `--plan ... --select ...` command explicitly approves those task IDs. Status and cancellation do not rerun analysis, and cancellation cannot undo an applied clean.
+
+| Host | In-host entry | Apply timing |
+| :-- | :-- | :-- |
+| OpenClaw | `/lightrsi clean`; use the same plan/select/status/cancel options | Successful explicit apply returns `applied` immediately |
+| Codex | User-entered `!lightrsi-clean` terminal selector or installed `lightrsi-clean` MCP-form skill | Next eligible host request |
+| Claude Code | Installed `lightrsi-clean` skill is analysis-only; approve with explicit plan and task IDs | Next eligible host request |
+| DeepSeek Harness | No public Cleaner command in the current adapter | Not exposed |
+
+For installation, interactive controls, protected tasks, and receipt meanings, see [Context Cleaner](/user-guide/context-cleaner).
+
 ## Next
 
 - [Reports and Visuals](/plugin-catalog/tokenpilot/reports-and-visuals) — using the browser dashboard

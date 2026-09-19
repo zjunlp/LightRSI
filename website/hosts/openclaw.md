@@ -102,6 +102,26 @@ lightrsi openclaw session <session-id> report
 lightrsi/gpt-5.4-mini
 ```
 
+## Context Cleaner
+
+Analyze the current mapped conversation without rewriting its context:
+
+```text
+/lightrsi clean
+```
+
+If the session cannot be resolved, use `/lightrsi clean --session <session-id>`. Review the returned plan and select only eligible task IDs:
+
+```text
+/lightrsi clean --plan <plan-id> --select <task-id-1>,<task-id-2>
+/lightrsi clean --status <plan-id>
+/lightrsi clean --cancel <plan-id>
+```
+
+`/tokenpilot clean` and `/tp clean` are aliases. After explicit approval, a successful OpenClaw clean archives task content through the canonical eviction backend, commits the rewrite, and returns an `applied` receipt immediately. The rewrite uses pointer stubs or drops selected content according to the replacement mode; cancelling a Cleaner plan does not undo an applied rewrite. The standalone entry is `lightrsi openclaw clean --session <session-id>`; in an interactive terminal it can open a selector after analysis.
+
+See [Context Cleaner](/user-guide/context-cleaner) for task protection, accounting, and cancellation limits.
+
 ## Recovery
 
 ```bash

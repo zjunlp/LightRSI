@@ -153,6 +153,7 @@ DeepSeek Harness uses `/tokenpilot-status` for the documented session status wor
 
 ## What's Next
 
+- [Context Cleaner](/user-guide/context-cleaner) — review and clean eligible task context with explicit approval
 - [Install Your First Plugin](/getting-started/install-first-plugin) — detailed install walkthrough
 - [Runtime Modes](/plugin-catalog/tokenpilot/runtime-modes) — choose conservative, normal, or aggressive
 - [CLI Reference](/user-guide/cli-reference) — all commands and flags

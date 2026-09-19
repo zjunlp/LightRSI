@@ -1,6 +1,8 @@
 # Install Your First Plugin
 
-After [installing LightRSI](/getting-started/install-lightrsi), install a plugin to add capabilities. Currently, TokenPilot is the only official plugin.
+After [installing LightRSI](/getting-started/install-lightrsi), install the integration for your host. TokenPilot is the context-management preset; Context Cleaner is the user-facing task cleanup product. Native host plugins, proxies, and gateways connect these capabilities to each host.
+
+The commands below install the host integration. Cleaner entrypoints and apply timing vary by host; see [Context Cleaner](/user-guide/context-cleaner#supported-hosts).
 
 ## Install TokenPilot
 
@@ -132,6 +134,7 @@ The OpenClaw, Codex, and Claude Code installers preserve the host configuration 
 
 ## Next
 
+- [Context Cleaner](/user-guide/context-cleaner) — inspect tasks, approve a clean, and verify its receipt
 - [Runtime Modes](/plugin-catalog/tokenpilot/runtime-modes) — choose your risk/aggressiveness level
 - [CLI Reference](/user-guide/cli-reference) — all available commands
 - [Troubleshooting](/plugin-catalog/tokenpilot/troubleshooting) — common install issues

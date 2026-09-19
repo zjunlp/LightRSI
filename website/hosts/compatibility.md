@@ -22,6 +22,7 @@ The matrix below distinguishes shared product interfaces from host-native capabi
 | Stable Prefix | ✅ | ✅ | ✅ | — |
 | Context Reduction | ✅ | ✅ | ✅ | — |
 | Automatic Context Eviction | ✅ | Opt-in response-chain rebase¹ | — | Opt-in; estimator and durable state required |
+| User-approved [Context Cleaner](/user-guide/context-cleaner) | Immediate canonical apply | Scheduled response-chain rebase | Scheduled request overlay | No public Cleaner entrypoint |
 | Visual Inspector | ✅ | ✅ | ✅ | — |
 | Session Reports (`report`) | ✅ | ✅ | ✅ | —; native status instead |
 | Session Status | `/lightrsi status` or CLI | `lightrsi codex status` | `lightrsi claude-code status` | `/tokenpilot-status`² |

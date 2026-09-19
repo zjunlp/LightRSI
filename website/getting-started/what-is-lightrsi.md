@@ -2,18 +2,23 @@
 
 LightRSI is a **modular runtime for recursive improvement in long-running LLM agents**. It provides the shared lifecycle, state, safety, observability, and host integration needed to build an improvement capability once and run it across OpenClaw, Codex, Claude Code, and future hosts. The current implementation focuses on context and agentic memory.
 
-## LightRSI vs. TokenPilot
+## Platform, Preset, and Product {#lightrsi-vs-tokenpilot}
 
-A common point of confusion: LightRSI and TokenPilot are not the same thing.
+LightRSI, TokenPilot, and Context Cleaner describe different parts of the system:
 
-| | LightRSI | TokenPilot |
+| Name | Type | Role |
 | :-- | :-- | :-- |
-| **What it is** | A recursive-improvement runtime and platform | A preset that runs on LightRSI |
-| **Role** | Loads, manages, and executes plugins | Provides cache-aware context management |
-| **Scope** | Platform-wide: plugins, adapters, CLI | One specific capability: reducing token usage |
-| **Status** | Active development | Stable — the first official plugin |
+| LightRSI | Runtime and platform | Shared lifecycle, state, safety, observability, and host integration |
+| TokenPilot | Context-management preset | Composes stable-prefix, reduction, and eviction capabilities |
+| Context Cleaner | User-facing product | Lets users inspect tasks, approve a selection, and check the cleanup result |
 
-LightRSI provides the reusable runtime boundary; TokenPilot supplies one concrete policy bundle for cache-efficient context management.
+Host adapters connect these capabilities to OpenClaw, Codex, Claude Code, and DeepSeek Harness. Some integrations are installed as native host plugins; supported features and product entrypoints vary by host.
+
+## Context Cleaner
+
+[Context Cleaner](/user-guide/context-cleaner) is LightRSI's product for user-approved context cleanup. It groups session context by task, presents recommendations and protected content, and applies only an explicitly selected clean. TokenPilot supplies reusable context-management policies; Cleaner provides an interactive workflow on top of the shared task and host rewrite capabilities.
+
+Available user entrypoints and apply timing differ by host. See the [Cleaner host table](/user-guide/context-cleaner#supported-hosts) before following the workflow.
 
 ## What Problems It Solves
 
@@ -22,7 +27,7 @@ LightRSI provides the reusable runtime boundary; TokenPilot supplies one concret
 - **Tool output is noisy**. Large tool responses can pollute future turns with irrelevant data.
 - **Sessions don't prune themselves**. Without eviction, old context accumulates until sessions hit limits or become too slow.
 
-LightRSI addresses these through its plugin model. TokenPilot, the first plugin, implements the runtime policies: stable-prefix rewriting, context reduction, and lifecycle-aware eviction.
+LightRSI provides shared infrastructure for these capabilities. TokenPilot, its first preset, composes stable-prefix rewriting, context reduction, and lifecycle-aware eviction.
 
 ## What It Doesn't Solve
 
@@ -32,10 +37,11 @@ LightRSI addresses these through its plugin model. TokenPilot, the first plugin,
 
 ## Relationship to the Paper
 
-The [TokenPilot paper](https://arxiv.org/abs/2606.17016) describes the cache-efficient context management technique. LightRSI is the platform that hosts TokenPilot as its first plugin, and will host additional plugins in the future.
+The [TokenPilot paper](https://arxiv.org/abs/2606.17016) describes the cache-efficient context management technique. TokenPilot is LightRSI's first preset.
 
 ## Next Steps
 
 - [Quick Start](/getting-started/quick-start) — get running in under 5 minutes
 - [Core Concepts](/platform-concepts/core-runtime) — understand the platform architecture
-- [TokenPilot Overview](/plugin-catalog/tokenpilot/overview) — dive into the featured plugin
+- [TokenPilot Overview](/plugin-catalog/tokenpilot/overview) — explore the context-management preset
+- [Context Cleaner](/user-guide/context-cleaner) — review and approve task-level cleanup
