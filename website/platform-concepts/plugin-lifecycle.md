@@ -5,6 +5,7 @@ No formal plugin lifecycle specification exists. TokenPilot uses host-specific m
 - **OpenClaw**: native plugin slot with bundled runtime
 - **Codex CLI**: hooks (`SessionStart`, `PreToolUse`, `PostToolUse`) via `hooks.json`
 - **Claude Code**: `SessionStart` hook + gateway + MCP recovery
+- **DeepSeek Harness**: native Cordis plugin (`tokenpilot-dsh`); opt-in eviction runs in `agent/pre-step` before native compaction by default
 
 ## Next
 

@@ -2,6 +2,17 @@
 
 Plugins are the core unit of functionality in LightRSI. This page covers how to list and manage installed plugins.
 
+## Host Management Interfaces
+
+| Host | Entry point |
+| :-- | :-- |
+| OpenClaw | `lightrsi openclaw status` |
+| Codex | `lightrsi codex status` |
+| Claude Code | `lightrsi claude-code status` |
+| DeepSeek Harness | `/tokenpilot-status` inside Harness; configure `tokenpilot-dsh` through its profile |
+
+The default-host and session-pinning commands below apply to the three shared CLI hosts. For DeepSeek Harness, see [profile configuration](/hosts/deepseek-harness#configure-and-enable).
+
 ## List Installed Plugins
 
 ```bash

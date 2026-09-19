@@ -2,6 +2,17 @@
 
 TokenPilot provides built-in reporting and a visual inspector so you can see exactly what it's doing.
 
+## Host Entry Points
+
+| Host | Report or status | Visual Inspector |
+| :-- | :-- | :-- |
+| OpenClaw | `lightrsi openclaw report` | `lightrsi openclaw visual` |
+| Codex | `lightrsi codex report` | `lightrsi codex visual` |
+| Claude Code | `lightrsi claude-code report` | `lightrsi claude-code visual` |
+| DeepSeek Harness | `/tokenpilot-status` inside a Harness session | Shared Visual interface does not apply |
+
+DeepSeek Harness reports estimator activity, scheduling, application, and deferrals through its native read-only status command. See [status fields](/hosts/deepseek-harness#verify-in-a-session). The shared report metrics and Visual walkthrough below apply to OpenClaw, Codex, and Claude Code.
+
 ## The Report Command
 
 The `report` command shows a summary of token usage, cache efficiency, and cost savings for the current session:
@@ -39,6 +50,16 @@ lightrsi visual
 ```
 
 This opens your default browser with three views: stabilizer, reduction, and eviction.
+
+## Context Cleaner Results
+
+User-approved Cleaner results are tracked by plan receipt, separately from the general session report:
+
+```bash
+lightrsi <host> clean --status <plan-id>
+```
+
+Use `openclaw`, `codex`, or `claude-code` for `<host>`. Distinguish estimated and scheduled savings from applied savings; character-based counts are not token counts or provider billing savings. See [Context Cleaner](/user-guide/context-cleaner#_3-check-the-result). DeepSeek Harness does not currently expose this Cleaner command.
 
 ## Next
 

@@ -19,6 +19,7 @@ Adapter install scripts:
 | OpenClaw | `pnpm component:install:tokenpilot:openclaw` |
 | Codex CLI | `npm --prefix components/adapters/codex run install:codex` |
 | Claude Code | `npm --prefix components/adapters/claude-code run install:claude-code` |
+| DeepSeek Harness | Build and pack `@lightrsi/deepseek-harness-adapter`, then add the `.tgz` through the Harness profile plugin installer; [commands](/hosts/deepseek-harness#install) |
 
 ## Related Pages
 

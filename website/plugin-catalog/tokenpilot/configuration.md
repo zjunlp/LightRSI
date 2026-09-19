@@ -1,6 +1,19 @@
 # TokenPilot Configuration
 
-TokenPilot settings control how aggressively it manages context. All settings have sensible defaults — you can start without changing anything.
+TokenPilot settings control how aggressively it manages context. Configuration differs by host.
+
+| Host | Configuration approach |
+| :-- | :-- |
+| OpenClaw | Runtime modes and individual feature settings below |
+| Codex | Shared CLI settings; see [supported features](/hosts/codex) |
+| Claude Code | Shared CLI settings; see [supported features](/hosts/claude-code) |
+| DeepSeek Harness | Explicit profile configuration: master switch, persistent state, estimator, and eviction settings |
+
+## DeepSeek Harness Configuration
+
+The `tokenpilot-dsh` Cordis plugin is **disabled by default**. Supply a durable `stateDir` and configure the estimator and eviction settings before enabling it. It runs eviction before Harness native compaction by default and bypasses optimization failures so the agent can continue.
+
+Use the [DeepSeek Harness configuration example and reference](/hosts/deepseek-harness#configure-and-enable). The runtime modes, stabilizer, reduction, and CLI settings below apply to the other host adapters, subject to their supported features.
 
 ## Core Settings
 

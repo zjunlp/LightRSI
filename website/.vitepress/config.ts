@@ -81,7 +81,7 @@ export default defineConfig({
           ],
         },
         {
-          text: 'TokenPilot',
+          text: 'TokenPilot (Preset)',
           collapsed: false,
           items: [
             { text: 'Overview', link: '/plugin-catalog/tokenpilot/overview' },
@@ -96,6 +96,13 @@ export default defineConfig({
             { text: 'Troubleshooting', link: '/plugin-catalog/tokenpilot/troubleshooting' },
           ],
         },
+        {
+          text: 'Context Cleaner (Product)',
+          collapsed: false,
+          items: [
+            { text: 'User Guide', link: '/user-guide/context-cleaner' },
+          ],
+        },
       ],
       '/hosts/': [
         {
@@ -105,6 +112,7 @@ export default defineConfig({
             { text: 'OpenClaw', link: '/hosts/openclaw' },
             { text: 'Codex', link: '/hosts/codex' },
             { text: 'Claude Code', link: '/hosts/claude-code' },
+            { text: 'DeepSeek Harness', link: '/hosts/deepseek-harness' },
           ],
         },
       ],
@@ -112,6 +120,7 @@ export default defineConfig({
         {
           text: 'User Guide',
           items: [
+            { text: 'Context Cleaner', link: '/user-guide/context-cleaner' },
             { text: 'Managing Plugins', link: '/user-guide/managing-plugins' },
             { text: 'Plugin Configuration', link: '/user-guide/plugin-configuration' },
             { text: 'Sessions', link: '/user-guide/sessions' },

@@ -7,6 +7,7 @@
 | OpenClaw | `~/.openclaw/openclaw.json` | Inside the host config |
 | Codex | `~/.codex/tokenpilot.json` | Separate plugin config file |
 | Claude Code | `~/.claude/tokenpilot.json` | Separate plugin config file |
+| DeepSeek Harness | Harness profile's `cordis.patch.yml` | `tokenpilot-dsh` config; [setup and defaults](/hosts/deepseek-harness#configure-and-enable) |
 
 ## Environment Variables
 

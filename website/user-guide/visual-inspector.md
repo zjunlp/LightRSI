@@ -2,6 +2,8 @@
 
 The visual inspector is a **browser-based dashboard** that shows TokenPilot's real-time behavior — cache efficiency, context trimming, and eviction decisions.
 
+This shared Visual interface covers OpenClaw, Codex, and Claude Code. DeepSeek Harness exposes session status through [`/tokenpilot-status`](/hosts/deepseek-harness#verify-in-a-session); the Visual commands below do not apply to its native integration.
+
 ## Opening the Inspector
 
 ```bash

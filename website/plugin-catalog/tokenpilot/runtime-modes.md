@@ -2,6 +2,17 @@
 
 TokenPilot provides three runtime modes: **conservative**, **normal**, and **aggressive**. Each is a preset that configures the stabilizer, reduction, and eviction subsystems. Switch modes at any time without restarting.
 
+## Host Availability
+
+| Host | Configuration |
+| :-- | :-- |
+| OpenClaw | `conservative`, `normal`, `aggressive` |
+| Codex | `conservative`, `normal` |
+| Claude Code | `conservative`, `normal` |
+| DeepSeek Harness | Configure `tokenpilot-dsh` in the Harness profile; the shared runtime-mode commands do not apply |
+
+For DeepSeek Harness, follow [Configure and Enable](/hosts/deepseek-harness#configure-and-enable). Its opt-in eviction is controlled by profile settings, not by choosing `aggressive` mode.
+
 ## Mode Comparison
 
 | Behavior | Conservative | Normal | Aggressive |

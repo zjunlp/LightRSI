@@ -9,9 +9,9 @@ This page covers the LightRSI platform installation — the shared runtime that 
 | **Node.js** | ≥ 18 | v20+ recommended |
 | **pnpm** | ≥ 9 | v10.32+ used in development |
 | **OS** | macOS, Linux, Windows (WSL) | Windows native may work but is less tested |
-| **Target Host** | OpenClaw / Codex / Claude Code for full TokenPilot support; DeepSeek Harness for compatibility smoke testing | At least one target integration must be available |
+| **Target Host** | OpenClaw / Codex / Claude Code / DeepSeek Harness | See [Host Compatibility](/hosts/compatibility) for capabilities |
 
-No cloud services, API keys, or external dependencies are required.
+Building LightRSI does not require API credentials. Host operation and optional model-based features have their own requirements. DeepSeek Harness requires a newer Node.js version and estimator credentials for eviction; follow its [dedicated setup guide](/hosts/deepseek-harness).
 
 ## Step 1: Clone the Repository
 
@@ -39,6 +39,8 @@ This builds the shared foundation and feature packages that plugins and adapters
 
 ## Step 4: Build and Install the CLI
 
+This step is for OpenClaw, Codex, and Claude Code. For DeepSeek Harness, continue with [native plugin installation](/hosts/deepseek-harness#install) and verify inside Harness using `/tokenpilot-status`; the shared CLI is not its installation or verification entrypoint.
+
 ```bash
 pnpm lightrsi:build
 pnpm lightrsi:install
@@ -60,6 +62,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## Verify Installation
 
+For the shared CLI hosts:
+
 ```bash
 lightrsi --help
 ```
@@ -76,7 +80,7 @@ This shows your current default host, pinned session, and config target.
 
 | Component | Location | Purpose |
 | :-- | :-- | :-- |
-| `lightrsi` CLI | `~/.local/bin/lightrsi` | Standalone CLI for all hosts |
+| `lightrsi` CLI | `~/.local/bin/lightrsi` | Standalone CLI for OpenClaw, Codex, and Claude Code |
 | Shared packages | `node_modules/` (workspace) | Runtime engine, types, contracts |
 | Host adapter code | `components/adapters/` | Per-host integration code |
 

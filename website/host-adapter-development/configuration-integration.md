@@ -9,6 +9,7 @@ From source:
 | **OpenClaw** | Plugin entry in `~/.openclaw/openclaw.json` | TokenPilot registered as a plugin within OpenClaw configuration |
 | **Codex CLI** | `~/.codex/tokenpilot.json` (runtime config) + `~/.codex/hooks.json` (hook registration) | `tokenpilot.json` stores provider config and runtime settings. `hooks.json` registers hooks (`SessionStart`, `PreToolUse`, `PostToolUse`). Host's `config.toml` modified to reroute provider `base_url` to local proxy |
 | **Claude Code** | `~/.claude/tokenpilot.json` (runtime config) + `~/.claude/settings.json` (gateway routing) + `~/.claude/.claude.json` (MCP registration) | `tokenpilot.json` stores runtime config. `settings.json` updated for gateway routing. `.claude.json` registers `tokenpilot_memory_fault_recover` MCP server |
+| **DeepSeek Harness** | Selected Harness profile's `cordis.patch.yml` | `tokenpilot-dsh` settings: master switch, durable `stateDir`, task-state estimator, eviction, and compaction ordering; see [configuration guide](/hosts/deepseek-harness#configure-and-enable) |
 
 ## Environment Variables
 

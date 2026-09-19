@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `lightrsi` CLI is the unified command interface across all hosts. This page documents every command.
+The `lightrsi` CLI provides shared commands for OpenClaw, Codex, and Claude Code. DeepSeek Harness uses its native plugin interface and [`/tokenpilot-status`](/hosts/deepseek-harness#verify-in-a-session).
 
 ## Global Commands
 
@@ -92,6 +92,41 @@ lightrsi claude-code reduction pass toolPayloadTrim <off>
 lightrsi claude-code reduction status
 lightrsi claude-code help
 ```
+
+## DeepSeek Harness Commands
+
+Inside a DeepSeek Harness session:
+
+```text
+/tokenpilot-status
+```
+
+This read-only command reports estimator activity, eligible eviction work, scheduled or applied changes, and deferrals without creating a model turn. The adapter is registered by Cordis as `tokenpilot-dsh`; it does not use the shared `lightrsi` CLI.
+
+See [DeepSeek Harness](/hosts/deepseek-harness) for plugin installation and configuration. The global CLI commands above apply to OpenClaw, Codex, and Claude Code.
+
+## Context Cleaner Commands
+
+Cleaner is available through the shared CLI for `openclaw`, `codex`, and `claude-code`:
+
+```bash
+lightrsi <host> clean
+lightrsi <host> clean --session <session-id>
+lightrsi <host> clean --plan <plan-id> --select <task-id-1>,<task-id-2>
+lightrsi <host> clean --status <plan-id>
+lightrsi <host> clean --cancel <plan-id>
+```
+
+Analysis does not rewrite context. A terminal may then open a selector; a non-TTY invocation prints the plan without approving it. The `--plan ... --select ...` command explicitly approves those task IDs. Status and cancellation do not rerun analysis, and cancellation cannot undo an applied clean.
+
+| Host | In-host entry | Apply timing |
+| :-- | :-- | :-- |
+| OpenClaw | `/lightrsi clean`; use the same plan/select/status/cancel options | Successful explicit apply returns `applied` immediately |
+| Codex | User-entered `!lightrsi-clean` terminal selector or installed `lightrsi-clean` MCP-form skill | Next eligible host request |
+| Claude Code | Installed `lightrsi-clean` skill is analysis-only; approve with explicit plan and task IDs | Next eligible host request |
+| DeepSeek Harness | No public Cleaner command in the current adapter | Not exposed |
+
+For installation, interactive controls, protected tasks, and receipt meanings, see [Context Cleaner](/user-guide/context-cleaner).
 
 ## Next
 
