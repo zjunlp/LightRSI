@@ -58,14 +58,23 @@ function isReplace(event: DshLogEventWithMeta): boolean {
 
 function messageText(data: Record<string, unknown>): string {
   const message = isObject(data.message) ? data.message : data;
-  const content = Array.isArray(message.content) ? message.content : [];
   const parts: string[] = [];
-  for (const block of content) {
-    if (!isObject(block)) continue;
-    if (block.type === "text" && typeof block.text === "string") parts.push(block.text);
-    else if (block.type === "tool-result" && typeof block.text === "string") parts.push(block.text);
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (!isObject(value)) return;
+    if (value.type === "text" && typeof value.text === "string") {
+      parts.push(value.text);
+      return;
+    }
+    if (Array.isArray(value.content)) visit(value.content);
+  };
+  visit(message.content);
+  if (parts.length === 0 && typeof message.text === "string") {
+    parts.push(message.text);
   }
-  if (parts.length === 0 && typeof message.text === "string") parts.push(message.text);
   return parts.join("\n");
 }
 
@@ -76,6 +85,22 @@ function toolCallText(data: Record<string, unknown>): string {
     try { return JSON.stringify(args); } catch { return String(args); }
   })();
   return `${name}(${argText})`;
+}
+
+/** Tool-call blocks live inside a DSH assistant message, not only in log-only tool/call events. */
+function assistantToolCalls(data: Record<string, unknown>): Array<{ callId: string; text: string }> {
+  const message = isObject(data.message) ? data.message : {};
+  const content = Array.isArray(message.content) ? message.content : [];
+  return content.flatMap((block) => {
+    if (!isObject(block)
+      || block.type !== "tool-call"
+      || typeof block.id !== "string"
+      || !block.id.trim()) return [];
+    return [{
+      callId: block.id,
+      text: toolCallText(block),
+    }];
+  });
 }
 
 function resultCallId(data: Record<string, unknown>): string | undefined {
@@ -155,18 +180,43 @@ export function buildDshCleanSnapshot(params: {
         continue; // turn/step boundaries + unknown types are not items
     }
 
-    const stableId = `event-${event.seq}-${KIND_SLUG[kind]}`;
-    const ref: ContextItemRef = {
-      stableId,
-      kind,
-      role: kind === "tool_call" ? "assistant" : kind === "tool_result" ? "user" : kind,
-      ...(callId ? { callId } : {}),
-      ...(turnTaskIds(registry, session.id, turn) ? { taskIds: turnTaskIds(registry, session.id, turn) } : {}),
-      fingerprint: fingerprint(kind, text),
-      chars: text.length,
-    };
-    items.push(ref);
-    itemTextByStableId[stableId] = text;
+    const taskIds = turnTaskIds(registry, session.id, turn);
+    const embeddedCalls = event.type === "assistant/message" && !isReplace(event)
+      ? assistantToolCalls(data)
+      : [];
+
+    // An assistant envelope containing only a tool call has no independent
+    // visible text. Keep its call item, but do not create a duplicate empty
+    // assistant item that would be independently selectable.
+    if (!(kind === "assistant" && text.length === 0 && embeddedCalls.length > 0)) {
+      const stableId = `event-${event.seq}-${KIND_SLUG[kind]}`;
+      const ref: ContextItemRef = {
+        stableId,
+        kind,
+        role: kind === "tool_call" ? "assistant" : kind === "tool_result" ? "user" : kind,
+        ...(callId ? { callId } : {}),
+        ...(taskIds ? { taskIds } : {}),
+        fingerprint: fingerprint(kind, text),
+        chars: text.length,
+      };
+      items.push(ref);
+      itemTextByStableId[stableId] = text;
+    }
+
+    for (const embedded of embeddedCalls) {
+      const stableId = `event-${event.seq}-tool-call-${embedded.callId}`;
+      const ref: ContextItemRef = {
+        stableId,
+        kind: "tool_call",
+        role: "assistant",
+        callId: embedded.callId,
+        ...(taskIds ? { taskIds } : {}),
+        fingerprint: fingerprint("tool_call", embedded.text),
+        chars: embedded.text.length,
+      };
+      items.push(ref);
+      itemTextByStableId[stableId] = embedded.text;
+    }
   }
 
   const base: ModelContextSnapshot = {

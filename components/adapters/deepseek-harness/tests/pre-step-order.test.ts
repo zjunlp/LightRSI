@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { registerEvictionPreStep } from "../src/eviction-engine.js";
+import { createDshCleanerPreStepState, registerDshCleanerPreStep } from "../src/cleaner-pre-step.js";
 import { normalizeDshConfig } from "../src/config.js";
 import type { DshPluginContext, DshPreStepDecision, DshPreStepNext, DshPreStepPayload } from "../src/types.js";
 
@@ -51,6 +52,23 @@ function payload(): DshPreStepPayload {
 const CONFIG = normalizeDshConfig({ enabled: true, eviction: { enabled: true } });
 
 describe("pre-step listener order (§1.3: eviction before compaction)", () => {
+  it("places Cleaner before automatic eviction and native compaction", () => {
+    const { ctx, handlers } = mockWaterfall();
+    const compaction: Handler = async (_p, next) => next();
+    ctx.on("agent/pre-step", compaction);
+    registerEvictionPreStep(ctx, CONFIG);
+    registerDshCleanerPreStep(ctx, normalizeDshConfig({
+      enabled: true,
+      stateDir: "C:/tmp/lightrsi-cleaner-order",
+      eviction: { enabled: true },
+    }), createDshCleanerPreStepState());
+
+    assert.equal(handlers.length, 3);
+    assert.notEqual(handlers[0], compaction, "Cleaner should run before compaction");
+    assert.notEqual(handlers[1], compaction, "eviction should run before compaction");
+    assert.equal(handlers[2], compaction);
+  });
+
   it("prepends eviction ahead of an already-registered compaction handler", () => {
     const { ctx, handlers } = mockWaterfall();
 
@@ -103,5 +121,29 @@ describe("pre-step listener order (§1.3: eviction before compaction)", () => {
     }));
     assert.equal(handlers[0], compaction);
     assert.equal(handlers.length, 2);
+  });
+
+  it("lets a Cleaner claim suppress automatic eviction for that same request", async () => {
+    const { ctx, run } = mockWaterfall();
+    let registryRead = false;
+    registerEvictionPreStep(
+      ctx,
+      normalizeDshConfig({
+        enabled: true,
+        stateDir: "C:/tmp/lightrsi-cleaner-order",
+        eviction: { enabled: true },
+      }),
+      {
+        load: () => {
+          registryRead = true;
+          throw new Error("automatic eviction should have been skipped");
+        },
+        persist: () => {},
+      },
+      { shouldSkipAutomaticEviction: () => true },
+    );
+
+    await run(payload());
+    assert.equal(registryRead, false);
   });
 });

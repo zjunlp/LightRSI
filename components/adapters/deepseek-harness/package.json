@@ -46,8 +46,11 @@
     "prepack": "pnpm run build"
   },
   "devDependencies": {
+    "@lightrsi/cleaner": "workspace:*",
     "@lightrsi/eviction": "workspace:*",
     "@lightrsi/history": "workspace:*",
+    "@lightrsi/host-adapter": "workspace:*",
+    "@lightrsi/product-surface": "workspace:*",
     "esbuild": "^0.25.10",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
@@ -59,8 +62,5 @@
     "context-management",
     "canonical-surface"
   ],
-  "dependencies": {
-    "@lightrsi/cleaner": "workspace:*",
-    "@lightrsi/host-adapter": "workspace:*"
-  }
+  "dependencies": {}
 }

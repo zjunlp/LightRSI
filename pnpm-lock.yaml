@@ -120,20 +120,22 @@ importers:
         version: 5.9.3
 
   components/adapters/deepseek-harness:
-    dependencies:
+    devDependencies:
       '@lightrsi/cleaner':
         specifier: workspace:*
         version: link:../../packages/features/cleaner
-      '@lightrsi/host-adapter':
-        specifier: workspace:*
-        version: link:../../packages/foundation/host-adapter
-    devDependencies:
       '@lightrsi/eviction':
         specifier: workspace:*
         version: link:../../packages/features/eviction
       '@lightrsi/history':
         specifier: workspace:*
         version: link:../../packages/foundation/history
+      '@lightrsi/host-adapter':
+        specifier: workspace:*
+        version: link:../../packages/foundation/host-adapter
+      '@lightrsi/product-surface':
+        specifier: workspace:*
+        version: link:../../packages/foundation/product-surface
       esbuild:
         specifier: ^0.25.10
         version: 0.25.12

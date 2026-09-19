@@ -164,6 +164,8 @@ export async function runDshEvictionCycle(params: {
   computeRevision: (session: AppendableSession) => string;
   evictionId?: string;
   minBlockChars?: number;
+  /** Track task state without modifying the canonical model-visible surface. */
+  allowSurfaceMutation?: boolean;
   persistRegistry?: (registry: SessionTaskRegistry, expectedVersion: number) => void | Promise<void>;
 }): Promise<EvictionCycleResult> {
   const { session, estimator, computeRevision } = params;
@@ -230,6 +232,23 @@ export async function runDshEvictionCycle(params: {
       result: emptyResult(),
       registryPersisted: true,
       status: delta.coveredTurnAbsIds.length === 0 ? "no-delta" : "empty",
+    };
+  }
+
+  // Context Cleaner needs the same completed-task registry as automatic
+  // eviction, but a Cleaner-only profile must never remove context before the
+  // user makes an explicit selection.  Advance the durable lifecycle
+  // watermark after a successful estimate while leaving DSH's surface intact.
+  if (params.allowSurfaceMutation === false) {
+    registry = { ...registry, lastProcessedTurnSeq: delta.toTurnSeqInclusive };
+    if (registryPersistedBeforeMutation && params.persistRegistry) {
+      await params.persistRegistry(registry, registryExpectedVersion);
+    }
+    return {
+      registry,
+      result: emptyResult(),
+      registryPersisted: true,
+      status: "empty",
     };
   }
 

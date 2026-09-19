@@ -1,124 +1,97 @@
-/**
- * TokenPilot DeepSeek Harness plugin entry (Cordis).
- *
- * The existing eviction implementation remains isolated in eviction-engine.
- * This entry only normalizes configuration and wires the available runtime
- * capabilities together.
- *
- * Projection and command services are optional. They are acquired through
- * ctx.inject() so headless compositions without those services still load.
- */
+/** TokenPilot DeepSeek Harness plugin entry (Cordis). */
 
 import { normalizeDshConfig } from "./config.js";
-
 import {
   registerTokenPilotCommands,
   type TokenPilotCommandContext,
 } from "./commands.js";
-
 import {
-  registerEvictionPreStep,
-} from "./eviction-engine.js";
-
+  registerContextCleanerCommands,
+  type ContextCleanerCommandContext,
+} from "./context-cleaner/commands.js";
+import type { DshCleanerSessionStore } from "./context-cleaner/session-catalog.js";
+import {
+  createDshCleanerPreStepState,
+  registerDshCleanerPreStep,
+} from "./cleaner-pre-step.js";
+import { registerEvictionPreStep } from "./eviction-engine.js";
 import {
   registerTokenPilotProjection,
   type TokenPilotProjectionContext,
 } from "./projection.js";
+import type { DshPluginContext } from "./types.js";
 
-import type {
-  DshPluginContext,
-} from "./types.js";
+export {
+  createDshCleanerCapabilities,
+  type DshCleanerCapabilityParams,
+} from "./context-cleaner/capabilities.js";
+export {
+  DSH_PRODUCT_HOST_REGISTRATION,
+  resolveDshStateDir,
+} from "./product-registration.js";
 
 /** Cordis plugin name. */
 export const name = "tokenpilot-dsh";
 
 /**
- * tokenMeter remains the only mandatory service.
- *
- * sessionProjections and commands are optional capabilities acquired through
- * ctx.inject(), so this change does not alter the existing Cordis bundle.
+ * All DSH services are acquired through optional child injections. This keeps
+ * headless compositions loadable and avoids Cordis's "without inject" error.
  */
-export const inject = ["tokenMeter"];
+export const inject: readonly string[] = [];
 
-type TokenPilotUiContext =
-  TokenPilotProjectionContext &
-  TokenPilotCommandContext;
+type CommandHost = ContextCleanerCommandContext & Pick<TokenPilotCommandContext, "commands">;
+type ProjectionHost = TokenPilotProjectionContext & Pick<TokenPilotCommandContext, "sessionProjections">;
+type RuntimeHost = DshPluginContext;
 
-interface DshOptionalCapabilityHost {
-  inject(
-    services: readonly [
-      "sessionProjections",
-      "commands",
-    ],
-    callback: (
-      ctx: TokenPilotUiContext,
-    ) => void,
-  ): void;
+type InjectableContext = {
+  inject?: (services: readonly string[], callback: (ctx: any) => void) => void;
+};
+
+function registerCommands(ctx: InjectableContext, config: ReturnType<typeof normalizeDshConfig>): void {
+  if (typeof ctx.inject !== "function") return;
+  ctx.inject(["commands"], (commandCtx: CommandHost & InjectableContext) => {
+    let sessions: DshCleanerSessionStore | undefined;
+    if (typeof commandCtx.inject === "function") {
+      commandCtx.inject(["sessions"], (sessionCtx: { sessions?: DshCleanerSessionStore }) => {
+        sessions = sessionCtx.sessions;
+      });
+    }
+
+    registerContextCleanerCommands(commandCtx, config, {
+      getSessions: () => sessions,
+    });
+
+    if (typeof commandCtx.inject !== "function") return;
+    commandCtx.inject(["sessionProjections"], (projectionCtx: ProjectionHost) => {
+      registerTokenPilotProjection(projectionCtx, config.enabled);
+      registerTokenPilotCommands(
+        {
+          commands: commandCtx.commands,
+          sessionProjections: projectionCtx.sessionProjections,
+        },
+      );
+    });
+  });
 }
 
-/**
- * Register the read-only whole-session projection and human status command
- * when the host composition provides both optional services.
- */
-function registerTokenPilotUi(
-  ctx: DshPluginContext,
-  enabled: boolean,
-): void {
-  const optionalCtx = ctx as DshPluginContext & {
-    inject?: DshOptionalCapabilityHost["inject"];
-  };
-
-  if (typeof optionalCtx.inject !== "function") {
-    return;
-  }
-
-  optionalCtx.inject(
-    [
-      "sessionProjections",
-      "commands",
-    ],
-    (featureCtx) => {
-      registerTokenPilotProjection(
-        featureCtx,
-        enabled,
-      );
-
-      registerTokenPilotCommands(
-        featureCtx,
-      );
-    },
-  );
+function registerRuntime(ctx: InjectableContext, config: ReturnType<typeof normalizeDshConfig>): void {
+  if (!config.enabled || typeof ctx.inject !== "function") return;
+  ctx.inject(["tokenMeter"], (runtimeCtx: RuntimeHost) => {
+    const cleanerState = createDshCleanerPreStepState();
+    // Both Cleaner and eviction prepend. Register eviction first so Cleaner is
+    // at the front: Cleaner -> automatic eviction (unless claimed) -> DSH's
+    // native compaction handler.
+    registerEvictionPreStep(runtimeCtx, config, undefined, {
+      shouldSkipAutomaticEviction: (payload) => cleanerState.wasClaimed(payload),
+    });
+    registerDshCleanerPreStep(runtimeCtx, config, cleanerState);
+  });
 }
 
 /** Cordis plugin entry. */
-export function apply(
-  ctx: DshPluginContext,
-  rawConfig?: unknown,
-): void {
-  const config =
-    normalizeDshConfig(rawConfig);
-
-  /*
-   * The read-only projection and status command can report disabled state.
-   * They never create a model turn or mutate the session surface.
-   */
-  registerTokenPilotUi(
-    ctx,
-    config.enabled,
-  );
-
-  /*
-   * The existing mutation path remains strictly default-off.
-   * No eviction handler is attached while the master flag is disabled.
-   */
-  if (!config.enabled) {
-    return;
-  }
-
-  registerEvictionPreStep(
-    ctx,
-    config,
-  );
+export function apply(ctx: unknown, rawConfig?: unknown): void {
+  const config = normalizeDshConfig(rawConfig);
+  const injectable = ctx as InjectableContext;
+  registerCommands(injectable, config);
+  registerRuntime(injectable, config);
 }
-
-export default apply;

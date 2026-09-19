@@ -173,6 +173,30 @@ describe("runDshEvictionCycle against the G1 oracle", () => {
     assert.equal(log.length, 0);
   });
 
+  it("tracks completed tasks without rewriting the surface in Cleaner-only mode", async () => {
+    const c = caseById("lifecycle-and-tool-safety");
+    const { session, log } = mockSession(c);
+    const persisted: Array<{ lastProcessedTurnSeq: number; completedTaskIds: string[] }> = [];
+    const out = await runDshEvictionCycle({
+      session,
+      registry: createEmptySessionTaskRegistry(c.sessionId),
+      estimator: estimatorFor(c),
+      computeRevision: stableRevision,
+      allowSurfaceMutation: false,
+      persistRegistry(registry) {
+        persisted.push({
+          lastProcessedTurnSeq: registry.lastProcessedTurnSeq,
+          completedTaskIds: [...registry.completedTaskIds],
+        });
+      },
+    });
+    assert.equal(out.result.status, "empty");
+    assert.equal(out.status, "empty");
+    assert.equal(log.filter((event) => event.opts?.surfaceOp !== undefined).length, 0);
+    assert.ok((persisted.at(-1)?.lastProcessedTurnSeq ?? 0) > 0);
+    assert.ok((persisted.at(-1)?.completedTaskIds.length ?? 0) > 0);
+  });
+
   it("does not advance the registry watermark after a partial surface commit", async () => {
     const c = caseById("lifecycle-and-tool-safety");
     const { session, log } = mockSession(c);

@@ -75,6 +75,12 @@ export interface RegistryStore {
   persist(sessionId: string, registry: SessionTaskRegistry, expectedVersion: number): void | Promise<void>;
 }
 
+/** Request-local coordination hook used by Context Cleaner. */
+export interface EvictionPreStepOptions {
+  /** Return true when Cleaner already claimed this pre-step's surface. */
+  shouldSkipAutomaticEviction?: (payload: DshPreStepPayload) => boolean;
+}
+
 function persistentRegistryStore(stateDir: string): RegistryStore {
   return {
     load: (sessionId) => loadSessionTaskRegistry(stateDir, sessionId),
@@ -97,6 +103,7 @@ export function registerEvictionPreStep(
   registryStore: RegistryStore | undefined = config.stateDir
     ? persistentRegistryStore(config.stateDir)
     : undefined,
+  options: EvictionPreStepOptions = {},
 ): void {
   const estimator = createDshTaskStateEstimator(config.taskStateEstimator);
 
@@ -105,10 +112,16 @@ export function registerEvictionPreStep(
   // of compaction-basic's (which registers normally), mirroring how DSH's own
   // invariant handler prepends to run first.
   ctx.on("agent/pre-step", async (payload: DshPreStepPayload, next: DshPreStepNext): Promise<DshPreStepDecision> => {
-    if (!config.enabled || !config.eviction.enabled) { log(config, "disabled"); return next(); }
+    // Estimation and registry persistence also power Context Cleaner. The
+    // eviction flag controls only automatic surface mutation, not lifecycle
+    // tracking, so a Cleaner-only profile can accumulate completed tasks.
+    if (!config.enabled) { log(config, "disabled"); return next(); }
 
     try {
       if (payload.signal.aborted) { log(config, "aborted"); return next(); }
+      // Cleaner has claimed this request and is about to use the same canonical
+      // surface transaction. Do not let automatic eviction race or duplicate it.
+      if (options.shouldSkipAutomaticEviction?.(payload)) return next();
 
       const session = payload.agent.session;
       if (session.events.length === 0) { log(config, "empty-log"); return next(); }
@@ -127,6 +140,7 @@ export function registerEvictionPreStep(
         estimator,
         computeRevision: surfaceRevision,
         minBlockChars: config.eviction.minBlockChars,
+        allowSurfaceMutation: config.eviction.enabled,
         persistRegistry: async (nextRegistry, expectedVersion) => {
           await registryStore.persist(session.id, nextRegistry, expectedVersion);
         },

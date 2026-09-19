@@ -47,10 +47,19 @@ test("packed DSH bundle resolves through its package entry", async () => {
       await readFile(join(installedDir, "package.json"), "utf8"),
     ) as Record<string, unknown>;
     assert.equal(manifest.main, "./dist/index.js");
-    assert.equal(
-      (manifest.dependencies as Record<string, unknown> | undefined)?.["@lightrsi/eviction"],
-      undefined,
-    );
+    for (const internalDependency of [
+      "@lightrsi/cleaner",
+      "@lightrsi/eviction",
+      "@lightrsi/history",
+      "@lightrsi/host-adapter",
+      "@lightrsi/product-surface",
+    ]) {
+      assert.equal(
+        (manifest.dependencies as Record<string, unknown> | undefined)?.[internalDependency],
+        undefined,
+        `${internalDependency} must be bundled rather than installed from npm`,
+      );
+    }
     assert.equal(
       await readFile(join(installedDir, "cordis.patch.yml"), "utf8")
         .then((value) => value.includes("@lightrsi/deepseek-harness-adapter")),
@@ -61,15 +70,43 @@ test("packed DSH bundle resolves through its package entry", async () => {
     const entry = require.resolve("@lightrsi/deepseek-harness-adapter");
     const plugin = await import(pathToFileURL(entry).href) as {
       name: string;
-      inject: string[];
-      apply(ctx: { on(event: string): void; tokenMeter: { measure(): object } }, config: unknown): void;
+      inject: readonly string[];
+      apply(ctx: { inject(services: readonly string[], callback: (scope: unknown) => void): void }, config: unknown): void;
     };
     const events: string[] = [];
+    const commands: string[] = [];
+    const commandScope = {
+      commands: {
+        register(definition: { name: string }) {
+          commands.push(definition.name);
+          return () => {};
+        },
+      },
+      inject(services: readonly string[], callback: (scope: unknown) => void) {
+        if (services.includes("sessions")) callback({ sessions: { list: () => [], get: () => undefined } });
+        if (services.includes("sessionProjections")) {
+          callback({
+            sessionProjections: {
+              register: () => () => {},
+              snapshot: () => ({ asOfSeq: -1, values: {} }),
+            },
+          });
+        }
+      },
+    };
     plugin.apply({
-      on(event) { events.push(event); },
-      tokenMeter: { measure: () => ({}) },
+      inject(services, callback) {
+        if (services.includes("commands")) callback(commandScope);
+        if (services.includes("tokenMeter")) {
+          callback({
+            on(event: string) { events.push(event); },
+            tokenMeter: { measure: () => ({}) },
+          });
+        }
+      },
     }, {
       enabled: true,
+      stateDir: "C:/tmp/lightrsi-release-test",
       eviction: { enabled: true },
       taskStateEstimator: {
         enabled: true,
@@ -79,8 +116,10 @@ test("packed DSH bundle resolves through its package entry", async () => {
       },
     });
     assert.equal(plugin.name, "tokenpilot-dsh");
-    assert.deepEqual(plugin.inject, ["tokenMeter"]);
-    assert.deepEqual(events, ["agent/pre-step"]);
+    assert.deepEqual(plugin.inject, []);
+    assert.equal("default" in plugin, false);
+    assert.deepEqual(events, ["agent/pre-step", "agent/pre-step"]);
+    assert.deepEqual(commands.sort(), ["context-cleaner", "tokenpilot-clean", "tokenpilot-status"]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
