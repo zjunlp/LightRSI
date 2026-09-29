@@ -64,6 +64,12 @@ for (const [host, style] of [
         assert.doesNotMatch(skillRaw, new RegExp(`^   lightrsi ${host} clean\\s+--`, "m"));
         assert.match(skillRaw, /Never choose task IDs, item IDs, item digests, or deletion ranges/);
         assert.match(skillRaw, /Never answer the confirmation prompt or run a follow-up command/);
+        assert.match(skillRaw, /Same-terminal interactive selection/);
+        assert.match(skillRaw, /user must run `\/exit`/);
+        assert.match(skillRaw, /lightrsi claude-code clean --require-tty --session <session-id>/);
+        assert.match(skillRaw, /Up\/Down moves, Space toggles a task, Enter submits, and `q` cancels/);
+        assert.match(skillRaw, /claude --resume <session-id>/);
+        assert.match(skillRaw, /next ordinary Claude Code request/);
         assert.ok(nodeFallbackLine, "cleaner skill fallback command missing");
         const command = parseJsonQuotedCommand(nodeFallbackLine);
         await execFileAsync(process.execPath, command, {

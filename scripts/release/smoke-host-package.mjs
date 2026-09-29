@@ -162,6 +162,11 @@ try {
     assert.doesNotMatch(cleanerSkill, new RegExp(`^   lightrsi ${host} clean\\s+--`, "m"));
     assert.match(cleanerSkill, /Never choose task IDs, item IDs, item digests, or deletion ranges/);
     assert.match(cleanerSkill, /Never answer the confirmation prompt or run a follow-up command/);
+    assert.match(cleanerSkill, /Same-terminal interactive selection/);
+    assert.match(cleanerSkill, /user must run `\/exit`/);
+    assert.match(cleanerSkill, /lightrsi claude-code clean --require-tty --session <session-id>/);
+    assert.match(cleanerSkill, /claude --resume <session-id>/);
+    assert.match(cleanerSkill, /next ordinary Claude Code request/);
   }
   const cleanerStatusSkill = (await readFile(join(skillsRoot, "lightrsi-clean-status", "SKILL.md"), "utf8")).replace(/\\+/g, "/");
   assert.match(cleanerStatusSkill, new RegExp(`^   lightrsi ${host} clean --status <plan-id>$`, "m"));

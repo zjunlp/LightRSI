@@ -131,6 +131,45 @@ Expected first-run shape:
 
 Claude Code currently supports `mode conservative` and `mode normal`. `mode aggressive` is not available on the current adapter.
 
+### Context Cleaner: same-terminal selection and resume
+
+Run `/lightrsi-clean` inside the Claude Code session you want to clean. The
+installed skill is analysis-only: Claude Code runs skill shell commands without
+a TTY, so it shows the plan but never selects tasks or schedules a rewrite. The
+plan includes a session-bound `Interactive selection in this same terminal`
+block. Follow that block exactly:
+
+1. Run `/exit` in Claude Code to return to the shell in the same terminal.
+2. Run the exact command printed with the plan:
+
+   ```bash
+   lightrsi claude-code clean --require-tty --session <session-id>
+   ```
+
+3. Use Up/Down to move, Space to toggle a task, Enter to submit, or `q` to
+   cancel. Protected tasks cannot be selected, and submitting an empty
+   selection changes nothing.
+4. Resume the same Claude Code session with the exact command printed by the
+   plan:
+
+   ```bash
+   claude --resume <session-id>
+   ```
+
+Submitting a selection only writes the existing Cleaner schedule. The selected
+tasks are cleaned once, through the normal gateway path, on the next ordinary
+request after the session is resumed. Cancelling writes the terminal receipt
+without scheduling a clean. The explicit session ID is required: do not replace
+it with the most recently active session when multiple Claude Code sessions are
+open.
+
+To inspect or cancel a plan from the shell, use the plan ID printed by Cleaner:
+
+```bash
+lightrsi claude-code clean --status <plan-id>
+lightrsi claude-code clean --cancel <plan-id>
+```
+
 ## Commands
 
 Claude Code command surface:
@@ -151,6 +190,7 @@ lightrsi claude-code reduction off
 lightrsi claude-code reduction mode light
 lightrsi claude-code reduction mode balanced
 lightrsi claude-code reduction pass toolPayloadTrim off
+lightrsi claude-code clean --help
 ```
 
 Supported reduction passes:

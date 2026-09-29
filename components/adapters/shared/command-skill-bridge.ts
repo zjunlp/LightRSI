@@ -98,6 +98,18 @@ function skillMarkdown(params: {
   cliCommand: string;
 }): string {
   const commandText = `lightrsi ${params.host} ${params.spec.commandArgs.join(" ")}`;
+  const claudeCleanerInteractiveHelp = params.host === "claude-code"
+    ? [
+      "",
+      "Same-terminal interactive selection:",
+      "- Claude Code runs this skill without a TTY, so this skill only analyzes and prints the plan.",
+      "- Preserve and point out the complete `Interactive selection in this same terminal` block from the command output.",
+      "- The user must run `/exit`, then personally run the printed `lightrsi claude-code clean --require-tty --session <session-id>` command in that same terminal.",
+      "- In the selector, Up/Down moves, Space toggles a task, Enter submits, and `q` cancels without scheduling a clean.",
+      "- After the selector returns, the user must run the printed `claude --resume <session-id>` command with that same session ID.",
+      "- Submitting schedules only the selected tasks. The rewrite runs once on the next ordinary Claude Code request after the session is resumed.",
+    ].join("\n")
+    : "";
   const codexCleanerAnalysisBody = [
     "Analyze and schedule a LightRSI Cleaner selection through the Codex MCP form.",
     "For exact raw terminal controls, the user must type the user-entered `!lightrsi-clean` command; it provides Up/Down, Space, Enter, and `q` directly in the current terminal.",
@@ -132,6 +144,7 @@ function skillMarkdown(params: {
       "- Never add `--plan`, `--select`, `--status`, or `--cancel` to the command.",
       "- Never answer the confirmation prompt or run a follow-up command from its output.",
       "- The user must personally review the analysis and enter any later confirmation command.",
+      claudeCleanerInteractiveHelp,
     ].join("\n"),
     cleaner_status: [
       `Read one local LightRSI Cleaner receipt for ${params.host} and return the output.`,
