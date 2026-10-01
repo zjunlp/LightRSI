@@ -3,7 +3,10 @@ import test from "node:test";
 
 import type { SessionTaskRegistry } from "@lightrsi/history";
 
-import { attributeClaudeSnapshotTasks } from "../src/context-cleaner/snapshot.js";
+import {
+  attributeClaudeSnapshotTasks,
+  scheduledCleanerAttributionUnavailable,
+} from "../src/context-cleaner/snapshot.js";
 import { buildClaudeContextSnapshot } from "../src/context-rewrite/snapshot.js";
 
 const SESSION = "claude-task-attribution";
@@ -158,4 +161,122 @@ test("rejects attribution from a registry for another session", () => {
     registry: wrongRegistry,
   });
   assert.ok(attributed.items.every((item) => item.taskIds === undefined));
+});
+
+test("treats explicit task reattribution as stale context rather than unavailable evidence", () => {
+  const inbound = messages();
+  const baseSnapshot = buildClaudeContextSnapshot({
+    sessionId: SESSION,
+    revision: "revision-reattributed",
+    messages: inbound as any,
+  });
+  const approvalSnapshot = attributeClaudeSnapshotTasks({
+    snapshot: baseSnapshot,
+    messages: inbound,
+    registry: registry({ "anthropic-tool-result:toolu_read": ["task-read"] }),
+  });
+  const currentSnapshot = attributeClaudeSnapshotTasks({
+    snapshot: baseSnapshot,
+    messages: inbound,
+    registry: registry(
+      { "anthropic-tool-result:toolu_read": ["task-other"] },
+      ["task-read", "task-other"],
+    ),
+  });
+
+  assert.equal(scheduledCleanerAttributionUnavailable({
+    selectedTaskIds: ["task-read"],
+    approvalSnapshot,
+    currentSnapshot,
+  }), false);
+});
+
+test("lets deterministic pair drift override unavailable attribution on another pair", () => {
+  const approvalMessages = [
+    ...messages().slice(0, -1),
+    {
+      role: "assistant",
+      content: [{ type: "tool_use", id: "toolu_other", name: "Read", input: {} }],
+    },
+    {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "toolu_other", content: "other" }],
+    },
+    { role: "user", content: [{ type: "text", text: "current request" }] },
+  ];
+  const approvalSnapshot = attributeClaudeSnapshotTasks({
+    snapshot: buildClaudeContextSnapshot({
+      sessionId: SESSION,
+      revision: "revision-multi-pair",
+      messages: approvalMessages as any,
+    }),
+    messages: approvalMessages,
+    registry: registry({
+      "anthropic-tool-result:toolu_read": ["task-read"],
+      "anthropic-tool-result:toolu_other": ["task-read"],
+    }),
+  });
+  const currentMessages = approvalMessages.filter((message) => {
+    const block = Array.isArray(message.content)
+      ? message.content[0] as Record<string, unknown> | undefined
+      : undefined;
+    return block?.id !== "toolu_read" && block?.tool_use_id !== "toolu_read";
+  });
+  const currentSnapshot = buildClaudeContextSnapshot({
+    sessionId: SESSION,
+    revision: "revision-multi-pair-current",
+    messages: currentMessages as any,
+  });
+
+  assert.equal(scheduledCleanerAttributionUnavailable({
+    selectedTaskIds: ["task-read"],
+    approvalSnapshot,
+    currentSnapshot,
+  }), false);
+});
+
+test("lets fingerprint drift override unavailable attribution on another pair", () => {
+  const approvalMessages = [
+    ...messages().slice(0, -1),
+    {
+      role: "assistant",
+      content: [{ type: "tool_use", id: "toolu_other", name: "Read", input: {} }],
+    },
+    {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "toolu_other", content: "other" }],
+    },
+    { role: "user", content: [{ type: "text", text: "current request" }] },
+  ];
+  const approvalSnapshot = attributeClaudeSnapshotTasks({
+    snapshot: buildClaudeContextSnapshot({
+      sessionId: SESSION,
+      revision: "revision-fingerprint-drift",
+      messages: approvalMessages as any,
+    }),
+    messages: approvalMessages,
+    registry: registry({
+      "anthropic-tool-result:toolu_read": ["task-read"],
+      "anthropic-tool-result:toolu_other": ["task-read"],
+    }),
+  });
+  const currentMessages = structuredClone(approvalMessages) as Array<{
+    content: Array<Record<string, unknown>>;
+  }>;
+  const changedResult = currentMessages
+    .flatMap((message) => message.content)
+    .find((block) => block.tool_use_id === "toolu_other");
+  assert.ok(changedResult);
+  changedResult.content = "changed other result";
+  const currentSnapshot = buildClaudeContextSnapshot({
+    sessionId: SESSION,
+    revision: "revision-fingerprint-drift-current",
+    messages: currentMessages as any,
+  });
+
+  assert.equal(scheduledCleanerAttributionUnavailable({
+    selectedTaskIds: ["task-read"],
+    approvalSnapshot,
+    currentSnapshot,
+  }), false);
 });

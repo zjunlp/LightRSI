@@ -3,6 +3,53 @@ import type { ContextItemRef, ModelContextSnapshot } from "@lightrsi/host-adapte
 
 import { buildToolResultSegments } from "../eviction.js";
 
+export function scheduledCleanerAttributionUnavailable(params: {
+  selectedTaskIds: readonly string[];
+  approvalSnapshot: ModelContextSnapshot;
+  currentSnapshot: ModelContextSnapshot;
+}): boolean {
+  const selectedTaskIds = new Set(params.selectedTaskIds);
+  const expectedTaskIdsByCallId = new Map<string, Set<string>>();
+  for (const item of params.approvalSnapshot.items) {
+    if (!item.callId) continue;
+    const expectedTaskIds = (item.taskIds ?? []).filter((taskId) => selectedTaskIds.has(taskId));
+    if (expectedTaskIds.length === 0) continue;
+    const accumulated = expectedTaskIdsByCallId.get(item.callId) ?? new Set<string>();
+    for (const taskId of expectedTaskIds) accumulated.add(taskId);
+    expectedTaskIdsByCallId.set(item.callId, accumulated);
+  }
+
+  let unavailableAttribution = false;
+  for (const [callId, expectedTaskIds] of expectedTaskIdsByCallId) {
+    const approvalPair = params.approvalSnapshot.items.filter((item) => item.callId === callId
+      && (item.kind === "tool_call" || item.kind === "tool_result"));
+    const currentPair = params.currentSnapshot.items.filter((item) => item.callId === callId
+      && (item.kind === "tool_call" || item.kind === "tool_result"));
+    const approvalCalls = approvalPair.filter((item) => item.kind === "tool_call");
+    const approvalResults = approvalPair.filter((item) => item.kind === "tool_result");
+    const currentCalls = currentPair.filter((item) => item.kind === "tool_call");
+    const currentResults = currentPair.filter((item) => item.kind === "tool_result");
+    // Missing, partial, or ambiguous pairs are genuine context drift and stay
+    // on the existing stale-validation path. That deterministic drift wins
+    // over unavailable attribution on any other approved pair.
+    if (approvalCalls.length !== 1
+      || approvalResults.length !== 1
+      || currentCalls.length !== 1
+      || currentResults.length !== 1) return false;
+    if (approvalCalls[0]!.fingerprint !== currentCalls[0]!.fingerprint
+      || approvalResults[0]!.fingerprint !== currentResults[0]!.fingerprint) return false;
+    const retainsApprovedTaskProof = [...expectedTaskIds].some((taskId) => (
+      currentPair.every((item) => item.taskIds?.includes(taskId))
+    ));
+    if (retainsApprovedTaskProof) continue;
+    // A different non-empty task attribution is also deterministic drift.
+    // Defer only when the complete pair has lost attribution evidence entirely.
+    if (currentPair.every((item) => (item.taskIds?.length ?? 0) > 0)) return false;
+    unavailableAttribution = true;
+  }
+  return unavailableAttribution;
+}
+
 function provenTaskIds(
   registry: SessionTaskRegistry,
   segmentId: string,

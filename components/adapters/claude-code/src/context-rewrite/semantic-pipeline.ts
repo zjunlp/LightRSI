@@ -78,6 +78,25 @@ export function buildUniqueToolCallTurnMap(
 }
 
 /**
+ * Recover historical tool-call ownership without claiming or persisting a new
+ * semantic turn. Manual Cleaner schedules intentionally pause the lifecycle
+ * planner, but the Cleaner still needs this read-only map to re-attribute the
+ * approved task scope on the next request.
+ */
+export async function loadPersistedToolCallTurnMap(params: {
+  stateDir: string;
+  sessionId: string;
+}): Promise<ReadonlyMap<string, string>> {
+  const allSeqs = await listRawSemanticTurnSeqs(params.stateDir, params.sessionId);
+  const loaded = await Promise.all(
+    allSeqs.map((seq) => loadRawSemanticTurnRecord(params.stateDir, params.sessionId, seq)),
+  );
+  return buildUniqueToolCallTurnMap(
+    loaded.filter((record): record is RawSemanticTurnRecord => record !== null),
+  );
+}
+
+/**
  * Prepare the (lastProcessed, now] semantic-delta materials for one Claude
  * request: claim the per-session turn seq, persist this turn's raw record,
  * load the registry, and rebuild the interval into a DeltaView. This is the

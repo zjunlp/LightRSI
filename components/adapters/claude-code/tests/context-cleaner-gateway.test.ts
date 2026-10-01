@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,19 +14,29 @@ import {
   type ContextCleanPlan,
 } from "@lightrsi/cleaner";
 import type { HostGatewayForwarder } from "@lightrsi/host-adapter";
-import type { SessionTaskRegistry } from "@lightrsi/history";
+import {
+  persistRawSemanticTurnRecord,
+  persistSessionTaskRegistry,
+  rawSemanticTurnRecordPath,
+  sessionTaskRegistryPath,
+  type SessionTaskRegistry,
+} from "@lightrsi/history";
 
 import { attributeClaudeSnapshotTasks } from "../src/context-cleaner/snapshot.js";
-import { scheduleClaudeCleanerPlan } from "../src/context-cleaner/scheduler.js";
+import {
+  acquireClaudeCleanerScheduleLock,
+  scheduleClaudeCleanerPlan,
+} from "../src/context-cleaner/scheduler.js";
 import { normalizeTokenPilotClaudeCodeConfig } from "../src/config.js";
 import { startClaudeCodeGatewayRuntime } from "../src/gateway-runtime.js";
 import { createConsoleLogger } from "../src/logger.js";
+import { buildRawSemanticTurnRecord } from "../src/context-rewrite/semantic-mapping.js";
+import { claudeContextRewriteBackend } from "../src/context-rewrite/backend.js";
 import { buildClaudeContextSnapshot } from "../src/context-rewrite/snapshot.js";
 import {
   readLatestClaudeSnapshotRecord,
   saveLatestClaudeSnapshot,
 } from "../src/context-rewrite/snapshot-store.js";
-import { persistSessionTaskRegistry } from "@lightrsi/history";
 
 const SESSION = "claude-cleaner-gateway-session";
 const PLAN = "claude-cleaner-gateway-plan";
@@ -46,6 +56,12 @@ async function reserveUnusedPort(): Promise<number> {
       server.close((error) => error ? reject(error) : resolve(address.port));
     });
   });
+}
+
+function withoutCodecDefaults(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value), (key, entry) => (
+    key === "is_error" && entry === false ? undefined : entry
+  ));
 }
 
 function registry(): SessionTaskRegistry {
@@ -169,7 +185,7 @@ test("slash clean apply control request preserves the approval-time snapshot", a
   }
 });
 
-test("scheduled Claude clean retries after upstream rejection and commits only an accepted overlay", async () => {
+test("scheduled Claude clean defers unavailable prerequisites and commits only an accepted overlay", async () => {
   const root = await mkdtemp(join(tmpdir(), "lightrsi-claude-cleaner-gateway-"));
   const stateDir = join(root, "state");
   const proxyPort = await reserveUnusedPort();
@@ -242,11 +258,13 @@ test("scheduled Claude clean retries after upstream rejection and commits only a
   };
 
   const forwarded: Array<Record<string, unknown>> = [];
+  let rejectNext = false;
   const forwarder: HostGatewayForwarder = {
     async requestRaw() { throw new Error("requestRaw not used"); },
     async request(params) {
       forwarded.push(params.payload as Record<string, unknown>);
-      if (forwarded.length === 1) {
+      if (rejectNext) {
+        rejectNext = false;
         return {
           status: 503,
           headers: { "content-type": "application/json" },
@@ -268,11 +286,23 @@ test("scheduled Claude clean retries after upstream rejection and commits only a
     async requestStream() { throw new Error("stream not used"); },
   };
   let resolverCalls = 0;
+  let failSnapshotRead = false;
   const runtime = await startClaudeCodeGatewayRuntime({
     config: normalizeTokenPilotClaudeCodeConfig({
       stateDir,
       proxyPort,
-      modules: { stabilizer: false, reduction: false, eviction: true },
+      modules: { stabilizer: true, reduction: true, eviction: true },
+      reduction: {
+        triggerMinChars: 256,
+        maxToolChars: 300,
+        passes: {
+          readStateCompaction: false,
+          toolPayloadTrim: true,
+          htmlSlimming: false,
+          execOutputTruncation: true,
+          agentsStartupOptimization: false,
+        },
+      },
       eviction: { enabled: true, minBlockChars: 1 },
       taskStateEstimator: { enabled: true, batchTurns: 1 },
     }),
@@ -283,11 +313,28 @@ test("scheduled Claude clean retries after upstream rejection and commits only a
         resolverCalls += 1;
         return undefined;
       },
+      async readSnapshot(
+        params: Parameters<typeof claudeContextRewriteBackend.readSnapshot>[0],
+      ) {
+        if (failSnapshotRead) throw new Error("simulated current snapshot failure");
+        return claudeContextRewriteBackend.readSnapshot(params);
+      },
     },
   });
 
   try {
-    await persistSessionTaskRegistry(stateDir, registry(), { expectedVersion: 0 });
+    const runtimeRegistry = registry();
+    runtimeRegistry.blockToTaskIds = {};
+    runtimeRegistry.turnToTaskIds = {
+      [`${SESSION}:t1`]: ["task-completed"],
+    };
+    await persistSessionTaskRegistry(stateDir, runtimeRegistry, { expectedVersion: 0 });
+    const rawTurn = buildRawSemanticTurnRecord({
+      sessionId: SESSION,
+      turnSeq: 1,
+      messages: historicalMessages.slice(0, 2),
+    });
+    await persistRawSemanticTurnRecord(stateDir, rawTurn);
     assert.deepEqual(await saveLatestClaudeSnapshot(stateDir, SESSION, baseSnapshot), { saved: true });
     assert.equal((await saveContextCleanPlan({ stateDir, plan })).outcome, "stored");
     const pending: Omit<ContextCleanPendingReceipt, "status"> = {
@@ -325,6 +372,129 @@ test("scheduled Claude clean retries after upstream rejection and commits only a
       ],
       max_tokens: 128,
     });
+    const originalMessages = (JSON.parse(requestBody) as { messages: Array<Record<string, unknown>> }).messages;
+
+    await rm(join(stateDir, "claude-context", "sessions"), { recursive: true, force: true });
+    const missingApprovalSnapshot = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-session-id": SESSION },
+      body: requestBody,
+    });
+    assert.equal(missingApprovalSnapshot.status, 200);
+    assert.equal((await readContextCleanReceipt({ stateDir, planId: PLAN })).value?.status, "scheduled");
+    assert.equal(forwarded.length, 1);
+    assert.deepEqual(withoutCodecDefaults(forwarded[0]!.messages), originalMessages);
+
+    assert.deepEqual(await saveLatestClaudeSnapshot(stateDir, SESSION, baseSnapshot), { saved: true });
+    await writeFile(rawSemanticTurnRecordPath(stateDir, SESSION, 1), "{not-json", "utf8");
+    const deferred = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-session-id": SESSION },
+      body: requestBody,
+    });
+    assert.equal(deferred.status, 200);
+    assert.equal((await readContextCleanReceipt({ stateDir, planId: PLAN })).value?.status, "scheduled");
+    assert.equal(
+      (await readLatestClaudeSnapshotRecord(stateDir, SESSION))?.snapshot.revision,
+      REVISION,
+    );
+    assert.equal(forwarded.length, 2);
+    const unchangedMessages = forwarded[1]!.messages as Array<Record<string, unknown>>;
+    assert.deepEqual(withoutCodecDefaults(unchangedMessages), originalMessages);
+
+    await rm(rawSemanticTurnRecordPath(stateDir, SESSION, 1), { force: true });
+    const missingRawTurnDeferred = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-session-id": SESSION },
+      body: requestBody,
+    });
+    assert.equal(missingRawTurnDeferred.status, 200);
+    assert.equal((await readContextCleanReceipt({ stateDir, planId: PLAN })).value?.status, "scheduled");
+    assert.equal(
+      (await readLatestClaudeSnapshotRecord(stateDir, SESSION))?.snapshot.revision,
+      REVISION,
+    );
+    assert.equal(forwarded.length, 3);
+    assert.deepEqual(withoutCodecDefaults(forwarded[2]!.messages), originalMessages);
+
+    await persistRawSemanticTurnRecord(stateDir, rawTurn);
+    await writeFile(sessionTaskRegistryPath(stateDir, SESSION), "{not-json", "utf8");
+    const registryDeferred = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-session-id": SESSION },
+      body: requestBody,
+    });
+    assert.equal(registryDeferred.status, 200);
+    assert.equal((await readContextCleanReceipt({ stateDir, planId: PLAN })).value?.status, "scheduled");
+    assert.equal(
+      (await readLatestClaudeSnapshotRecord(stateDir, SESSION))?.snapshot.revision,
+      REVISION,
+    );
+    assert.equal(forwarded.length, 4);
+    assert.deepEqual(withoutCodecDefaults(forwarded[3]!.messages), originalMessages);
+
+    await rm(sessionTaskRegistryPath(stateDir, SESSION), { force: true });
+    const missingRegistryDeferred = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-session-id": SESSION },
+      body: requestBody,
+    });
+    assert.equal(missingRegistryDeferred.status, 200);
+    assert.equal((await readContextCleanReceipt({ stateDir, planId: PLAN })).value?.status, "scheduled");
+    assert.equal(
+      (await readLatestClaudeSnapshotRecord(stateDir, SESSION))?.snapshot.revision,
+      REVISION,
+    );
+    assert.equal(forwarded.length, 5);
+    assert.deepEqual(withoutCodecDefaults(forwarded[4]!.messages), originalMessages);
+
+    await persistSessionTaskRegistry(stateDir, runtimeRegistry);
+    failSnapshotRead = true;
+    const snapshotDeferred = await fetch(`${runtime.baseUrl}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-session-id": SESSION },
+      body: requestBody,
+    });
+    failSnapshotRead = false;
+    assert.equal(snapshotDeferred.status, 200);
+    assert.equal((await readContextCleanReceipt({ stateDir, planId: PLAN })).value?.status, "scheduled");
+    assert.equal(
+      (await readLatestClaudeSnapshotRecord(stateDir, SESSION))?.snapshot.revision,
+      REVISION,
+    );
+    assert.equal(forwarded.length, 6);
+    assert.deepEqual(withoutCodecDefaults(forwarded[5]!.messages), originalMessages);
+
+    const heldCleanerLock = await acquireClaudeCleanerScheduleLock({ stateDir, sessionId: SESSION });
+    assert.ok(heldCleanerLock);
+    let lockDeferred: Response;
+    try {
+      lockDeferred = await fetch(`${runtime.baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-session-id": SESSION },
+        body: requestBody,
+      });
+    } finally {
+      await heldCleanerLock.release();
+    }
+    assert.equal(lockDeferred.status, 200);
+    assert.equal((await readContextCleanReceipt({ stateDir, planId: PLAN })).value?.status, "scheduled");
+    assert.equal(
+      (await readLatestClaudeSnapshotRecord(stateDir, SESSION))?.snapshot.revision,
+      REVISION,
+    );
+    assert.equal(forwarded.length, 7);
+    assert.deepEqual(withoutCodecDefaults(forwarded[6]!.messages), originalMessages);
+    const deferredTrace = (await readFile(join(stateDir, "event-trace.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((entry) => entry.stage === "gateway_before_call")
+      .at(-1);
+    assert.equal(deferredTrace?.stablePrefixApplied, false);
+    assert.equal(deferredTrace?.reductionApplied, false);
+
+    rejectNext = true;
     const rejected = await fetch(`${runtime.baseUrl}/v1/messages`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-session-id": SESSION },
@@ -341,22 +511,24 @@ test("scheduled Claude clean retries after upstream rejection and commits only a
 
     assert.equal(response.status, 200);
     assert.equal(resolverCalls, 0);
-    assert.equal(forwarded.length, 2);
-    const messages = forwarded[1]!.messages as Array<Record<string, unknown>>;
-    assert.deepEqual((messages[0]!.content as Array<Record<string, unknown>>)[0], {
-      type: "tool_use",
-      id: "toolu_cleaner_gateway",
-      name: "Read",
-      input: {},
-    });
-    assert.match(
-      String((messages[1]!.content as Array<Record<string, unknown>>)[0]!.content),
-      /^\[(Tool payload trimmed|evicted: earlier tool result)/,
-    );
-    assert.equal(
-      (messages.at(-1)!.content as Array<Record<string, unknown>>)[0]!.text,
-      "KEEP_CURRENT_REQUEST",
-    );
+    assert.equal(forwarded.length, 9);
+    for (const forwardedIndex of [7, 8]) {
+      const messages = forwarded[forwardedIndex]!.messages as Array<Record<string, unknown>>;
+      assert.deepEqual((messages[0]!.content as Array<Record<string, unknown>>)[0], {
+        type: "tool_use",
+        id: "toolu_cleaner_gateway",
+        name: "Read",
+        input: {},
+      });
+      assert.match(
+        String((messages[1]!.content as Array<Record<string, unknown>>)[0]!.content),
+        /^\[(Tool payload trimmed|evicted: earlier tool result)/,
+      );
+      assert.equal(
+        (messages.at(-1)!.content as Array<Record<string, unknown>>)[0]!.text,
+        "KEEP_CURRENT_REQUEST",
+      );
+    }
     const receipt = await readContextCleanReceipt({ stateDir, planId: PLAN });
     assert.equal(receipt.value?.status, "applied");
     assert.deepEqual(receipt.value?.evidence?.itemIds, approvedItems.map((item) => item.stableId));

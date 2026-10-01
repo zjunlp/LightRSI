@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   loadSessionTaskRegistry,
   loadRawSemanticTurnRecord,
+  persistRawSemanticTurnRecord,
   persistSessionTaskRegistry,
   type SessionTaskRegistry,
   type DeltaView,
@@ -13,8 +14,10 @@ import {
 import type { TaskStateEstimator } from "@lightrsi/eviction";
 import {
   buildUniqueToolCallTurnMap,
+  loadPersistedToolCallTurnMap,
   runSemanticPipeline,
 } from "../src/context-rewrite/semantic-pipeline.js";
+import { buildRawSemanticTurnRecord } from "../src/context-rewrite/semantic-mapping.js";
 import { updateRegistryFromDelta as realUpdateRegistryFromDelta } from "../src/context-rewrite/task-registry-update.js";
 
 async function tempStateDir(): Promise<string> {
@@ -288,6 +291,31 @@ test("tool call attribution fails closed when a call id appears in multiple turn
     buildUniqueToolCallTurnMap([turns[0]!]).get("duplicate-call-id"),
     "sess-map:t1",
   );
+});
+
+test("loads the persisted tool-call turn map without claiming a new turn", async () => {
+  const stateDir = await tempStateDir();
+  const sessionId = "sess-persisted-map";
+  const record = buildRawSemanticTurnRecord({
+    sessionId,
+    turnSeq: 3,
+    messages: [
+      {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "toolu_persisted", name: "Read", input: {} }],
+      },
+      {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: "toolu_persisted", content: "done" }],
+      },
+    ],
+  });
+  await persistRawSemanticTurnRecord(stateDir, record);
+
+  const result = await loadPersistedToolCallTurnMap({ stateDir, sessionId });
+
+  assert.equal(result.get("toolu_persisted"), `${sessionId}:t3`);
+  assert.equal(await loadRawSemanticTurnRecord(stateDir, sessionId, 4), null);
 });
 
 test("internal Claude metadata requests do not advance or invoke the semantic estimator", async () => {
