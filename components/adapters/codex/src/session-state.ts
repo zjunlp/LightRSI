@@ -22,6 +22,8 @@ export type CodexSessionSnapshot = {
   workspaceHint?: string;
   transcriptPath?: string;
   disclosedReadPaths?: string[];
+  /** Normalized read path -> call_id of the read that first disclosed it (null: not attributable). */
+  disclosedReadOwners?: Record<string, string | null>;
   lastHookEvent?: string;
   lastToolName?: string;
   lastToolInputChars?: number;
@@ -105,6 +107,7 @@ export async function upsertCodexSessionSnapshot(
     workspaceHint: patch.workspaceHint ?? current?.workspaceHint,
     transcriptPath: patch.transcriptPath ?? current?.transcriptPath,
     disclosedReadPaths: patch.disclosedReadPaths ?? current?.disclosedReadPaths,
+    disclosedReadOwners: patch.disclosedReadOwners ?? current?.disclosedReadOwners,
     lastHookEvent: patch.lastHookEvent ?? current?.lastHookEvent,
     lastToolName: patch.lastToolName ?? current?.lastToolName,
     lastToolInputChars: patch.lastToolInputChars ?? current?.lastToolInputChars,
@@ -145,6 +148,7 @@ export async function mergeCodexSessionSnapshot(
     workspaceHint: target?.workspaceHint ?? source.workspaceHint,
     transcriptPath: target?.transcriptPath ?? source.transcriptPath,
     disclosedReadPaths: target?.disclosedReadPaths ?? source.disclosedReadPaths,
+    disclosedReadOwners: target?.disclosedReadOwners ?? source.disclosedReadOwners,
     lastHookEvent: target?.lastHookEvent ?? source.lastHookEvent,
     lastToolName: target?.lastToolName ?? source.lastToolName,
     lastToolInputChars: target?.lastToolInputChars ?? source.lastToolInputChars,

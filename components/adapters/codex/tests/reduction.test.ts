@@ -189,6 +189,7 @@ export function saveConfig(file: string, text: string) {
 
     await upsertCodexSessionSnapshot(config.stateDir, "sess-read-1", {
       disclosedReadPaths: first.disclosedReadPaths,
+      disclosedReadOwners: first.disclosedReadOwners,
     });
 
     const secondPayload: any = {

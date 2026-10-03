@@ -1976,6 +1976,7 @@ export async function startCodexResponsesProxy(params: {
           latestModel: model,
           latestUpstreamProvider: upstreamProviderName,
           disclosedReadPaths: reductionSummary?.disclosedReadPaths,
+          disclosedReadOwners: reductionSummary?.disclosedReadOwners,
         });
         if (typeof snapshot.responseId === "string" && snapshot.responseId) {
           await indexCodexResponseSession(config.stateDir, snapshot.responseId, sessionId);
@@ -2127,6 +2128,7 @@ export async function startCodexResponsesProxy(params: {
         latestModel: model,
         latestUpstreamProvider: upstreamProviderName,
         disclosedReadPaths: reductionSummary?.disclosedReadPaths,
+        disclosedReadOwners: reductionSummary?.disclosedReadOwners,
       });
       if (typeof responseId === "string" && responseId) {
         await indexCodexResponseSession(config.stateDir, responseId, sessionId);
